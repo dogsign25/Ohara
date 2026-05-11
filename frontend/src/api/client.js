@@ -1,7 +1,6 @@
-const BASE = '/api'
-
 async function get(path, params = {}) {
-  const url = new URL(path, window.location.origin + BASE)
+  // /api/graph 처럼 풀 경로를 origin에 붙여야 Vite 프록시가 정상 동작
+  const url = new URL(`/api${path}`, window.location.origin)
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined) url.searchParams.set(k, v)
   })

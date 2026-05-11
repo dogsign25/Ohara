@@ -34,7 +34,7 @@ class GraphWriter:
         a   = result.article
 
         with self._driver.session() as s:
-            # 1) Article 노드
+            # Article 노드
             s.run("""
                 MERGE (a:Article {url: $url})
                 ON CREATE SET a.title=$title, a.source=$source,
@@ -43,17 +43,18 @@ class GraphWriter:
             """, url=a.url, title=a.title, source=a.source,
                  pub=a.published_at.isoformat(), now=now)
 
-            # 2) Entity 노드 + MENTIONED_IN
+            # Entity 노드 — type을 속성으로 저장 (Java에서 labels() 없이 읽기 위함)
             for e in result.entities:
                 s.run(f"""
                     MERGE (e:{e.etype} {{name: $name}})
-                    ON CREATE SET e.createdAt = $now
+                    ON CREATE SET e.type=$etype, e.createdAt=$now
+                    ON MATCH  SET e.type=$etype
                     WITH e
                     MATCH (a:Article {{url: $url}})
                     MERGE (e)-[:MENTIONED_IN]->(a)
-                """, name=e.name, url=a.url, now=now)
+                """, name=str(e.name), etype=e.etype, url=a.url, now=now)
 
-            # 3) RELATED_TO: strength 누적
+            # RELATED_TO: strength 누적
             for x, y in combinations(result.entities, 2):
                 s.run(f"""
                     MATCH (a:{x.etype} {{name: $nx}})
@@ -64,7 +65,7 @@ class GraphWriter:
                     ON MATCH  SET r.strength=r.strength+1,
                                   r.articleCount=r.articleCount+1,
                                   r.lastMentioned=$now
-                """, nx=x.name, ny=y.name, now=now)
+                """, nx=str(x.name), ny=str(y.name), now=now)
 
     def write_batch(self, results):
         ok = 0
