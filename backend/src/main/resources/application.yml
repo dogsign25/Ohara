@@ -1,4 +1,20 @@
 spring:
+  # ── MySQL (회원 정보) ──────────────────────────────────────────
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/ohara?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:ohara1234}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update        # 첫 실행 시 users 테이블 자동 생성
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  # ── Neo4j (그래프 데이터) ──────────────────────────────────────
   neo4j:
     uri: ${NEO4J_URI:bolt://localhost:7687}
     authentication:

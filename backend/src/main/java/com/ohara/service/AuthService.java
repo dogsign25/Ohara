@@ -1,5 +1,8 @@
 package com.ohara.service;
 
+import com.ohara.entity.User;
+import com.ohara.model.AuthDto;
+import com.ohara.repository.UserRepository;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -47,7 +50,7 @@ public class AuthService {
     // ── 로그인 ────────────────────────────────────────────────────
     public AuthDto.AuthResponse login(AuthDto.LoginRequest req) {
         User user = userRepo.findByUsername(req.username())
-            .orElseThrow(() -> new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다."));
+                .orElseThrow(() -> new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다."));
 
         if (!encoder.matches(req.password(), user.getPassword()))
             throw new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다.");
