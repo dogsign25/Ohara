@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { authApi, saveAuth } from '../api/auth.js'
 
-export default function Login({ onSuccess, onGoRegister }) {
+export default function Login({ onSuccess, onGoRegister, onGoLanding }) {
   const [form,    setForm]    = useState({ username: '', password: '' })
   const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
@@ -28,46 +28,69 @@ export default function Login({ onSuccess, onGoRegister }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#050810] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
 
+        {/* 뒤로가기 */}
+        <button
+          onClick={onGoLanding}
+          className="flex items-center gap-1.5 text-white/30 hover:text-white/60 text-sm mb-8 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+          </svg>
+          홈으로
+        </button>
+
         {/* 로고 */}
-        <div className="text-center mb-10">
-          <h1 className="text-5xl font-bold text-white tracking-tight mb-2">OHARA</h1>
-          <p className="text-blue-400 text-sm">Global Relationship Intelligence</p>
+        <div className="mb-10">
+          <div className="flex items-center gap-2 mb-3">
+            <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
+              <circle cx="11" cy="11" r="3" fill="#60a5fa"/>
+              <circle cx="4"  cy="4"  r="2" fill="#c084fc" opacity="0.8"/>
+              <circle cx="18" cy="5"  r="2" fill="#fbbf24" opacity="0.8"/>
+              <circle cx="4"  cy="18" r="2" fill="#fbbf24" opacity="0.8"/>
+              <circle cx="18" cy="17" r="2" fill="#c084fc" opacity="0.8"/>
+              <line x1="11" y1="11" x2="4"  y2="4"  stroke="rgba(255,255,255,0.2)" strokeWidth="0.8"/>
+              <line x1="11" y1="11" x2="18" y2="5"  stroke="rgba(255,255,255,0.2)" strokeWidth="0.8"/>
+              <line x1="11" y1="11" x2="4"  y2="18" stroke="rgba(255,255,255,0.2)" strokeWidth="0.8"/>
+              <line x1="11" y1="11" x2="18" y2="17" stroke="rgba(255,255,255,0.2)" strokeWidth="0.8"/>
+            </svg>
+            <span className="text-white font-bold tracking-widest text-sm uppercase">OHARA</span>
+          </div>
+          <h1 className="text-white text-2xl font-bold">로그인</h1>
+          <p className="text-white/35 text-sm mt-1">인텔리전스 플랫폼에 접속하세요</p>
         </div>
 
-        {/* 카드 */}
-        <div className="bg-gray-900 border border-white/10 rounded-2xl p-8">
-          <h2 className="text-white text-xl font-semibold mb-6">로그인</h2>
-
+        {/* 폼 */}
+        <div className="bg-white/3 border border-white/8 rounded-2xl p-7">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-white/50 text-sm block mb-1.5">아이디</label>
+              <label className="text-white/45 text-xs uppercase tracking-widest block mb-2">아이디</label>
               <input
                 type="text"
                 value={form.username}
                 onChange={set('username')}
                 placeholder="아이디 입력"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-white/20 outline-none focus:border-blue-500/60 focus:bg-white/8 transition-all"
                 required
               />
             </div>
 
             <div>
-              <label className="text-white/50 text-sm block mb-1.5">비밀번호</label>
+              <label className="text-white/45 text-xs uppercase tracking-widest block mb-2">비밀번호</label>
               <input
                 type="password"
                 value={form.password}
                 onChange={set('password')}
                 placeholder="비밀번호 입력"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 outline-none focus:border-blue-500 transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-white/20 outline-none focus:border-blue-500/60 focus:bg-white/8 transition-all"
                 required
               />
             </div>
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">
+              <div className="bg-red-500/8 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm">
                 {error}
               </div>
             )}
@@ -75,19 +98,19 @@ export default function Login({ onSuccess, onGoRegister }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-900 disabled:text-blue-700 text-white font-semibold py-3 rounded-xl transition-colors mt-2"
+              className="w-full bg-blue-500 hover:bg-blue-400 disabled:bg-blue-900 disabled:text-blue-700 text-white font-semibold py-3 rounded-xl transition-all mt-2 text-sm"
             >
-              {loading ? '로그인 중...' : '로그인'}
+              {loading ? '접속 중...' : '로그인'}
             </button>
           </form>
-
-          <p className="text-center text-white/40 text-sm mt-6">
-            계정이 없으신가요?{' '}
-            <button onClick={onGoRegister} className="text-blue-400 hover:text-blue-300 transition-colors">
-              회원가입
-            </button>
-          </p>
         </div>
+
+        <p className="text-center text-white/30 text-sm mt-5">
+          계정이 없으신가요?{' '}
+          <button onClick={onGoRegister} className="text-blue-400 hover:text-blue-300 transition-colors">
+            회원가입
+          </button>
+        </p>
       </div>
     </div>
   )
