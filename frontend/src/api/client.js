@@ -24,4 +24,16 @@ export const api = {
   search(q, limit = 10) {
     return get('/search', { q, limit })
   },
+  // ★ 추가: 워크스페이스 전용 그래프
+  getWorkspaceGraph(workspaceId, limit = 100, minStrength = 1) {
+      return get(`/graph/workspace/${workspaceId}`, { limit, minStrength })
+  },
+
+  getNode(name) {
+      return get(`/node/${encodeURIComponent(name)}`)
+  },
+
+  search(q, limit = 10) {
+      return get('/search', { q, limit })
+  },
 }

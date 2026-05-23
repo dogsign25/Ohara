@@ -8,6 +8,7 @@ import GraphControls from './components/GraphControls.jsx'
 import FilterPanel, { filterEdges } from './components/FilterPanel.jsx'
 import WorkspacePanel from './components/WorkspacePanel.jsx'
 
+
 const NODE_COLOR = {
   Country:      '#60a5fa',
   Organization: '#fbbf24',
@@ -29,23 +30,32 @@ export default function App({ user, onLogout }) {
   const [edgeFilter,   setEdgeFilter]   = useState('all')
   const [showFilter,     setShowFilter]     = useState(false)
   const [showWorkspace,  setShowWorkspace]  = useState(false)
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null)
 
   // ── 그래프 로드 ────────────────────────────────────────────────
-  const loadGraph = useCallback(async () => {
+  // 워크스페이스 선택 시 해당 워크스페이스 노드만 쿼리
+const loadGraph = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await api.getGraph(limit, minStrength)
-      const nodes = data.nodes.map(n => ({ id: n.name, name: n.name, type: n.type, degree: n.degree }))
-      const links = data.edges.map(e => ({ source: e.source, target: e.target, strength: e.strength }))
-      setGraphData({ nodes, links })
+        let data
+        if (selectedWorkspaceId) {
+            // 워크스페이스 전용 그래프 (GraphController에 추가 필요)
+            data = await api.getWorkspaceGraph(selectedWorkspaceId, limit, minStrength)
+        } else {
+            // 기존 전역 그래프
+            data = await api.getGraph(limit, minStrength)
+        }
+        const nodes = data.nodes.map(n => ({ id: n.name, name: n.name, type: n.type, degree: n.degree }))
+        const links = data.edges.map(e => ({ source: e.source, target: e.target, strength: e.strength }))
+        setGraphData({ nodes, links })
     } catch (err) {
-      console.error('그래프 로드 실패:', err)
+        console.error('그래프 로드 실패:', err)
     } finally {
-      setLoading(false)
+        setLoading(false)
     }
-  }, [limit, minStrength])
-
-  useEffect(() => { loadGraph() }, [loadGraph])
+}, [limit, minStrength, selectedWorkspaceId])  // selectedWorkspaceId 의존성 추가
+ 
+useEffect(() => { loadGraph() }, [loadGraph])
 
   // ── 엣지 필터 적용 ──────────────────────────────────────────────
   useEffect(() => {
@@ -153,11 +163,13 @@ export default function App({ user, onLogout }) {
   return (
     <div className="relative w-screen h-screen bg-gray-950 overflow-hidden">
 
-      {/* 워크스페이스 패널 */}
       <WorkspacePanel
-        show={showWorkspace}
-        selectedNode={selectedNode}
-        selectedNodeType={filtered.nodes.find(n => n.id === selectedNode)?.type ?? null}
+          show={showWorkspace}
+          onSelectWorkspace={(wsId) => {
+              setSelectedWorkspaceId(wsId)
+              setSelectedNode(null)
+              setHighlight(null)
+          }}
       />
 
       {/* 상단 툴바 */}
@@ -200,6 +212,19 @@ export default function App({ user, onLogout }) {
           </svg>
           워크스페이스
         </button>
+
+        {selectedWorkspaceId && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+            워크스페이스 그래프
+            <button
+              onClick={() => setSelectedWorkspaceId(null)}
+              className="text-blue-400/60 hover:text-blue-300 ml-1"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* 필터 토글 */}
         <button

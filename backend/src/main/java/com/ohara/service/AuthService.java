@@ -14,14 +14,17 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AuthService {
 
     private final UserRepository userRepo;
-    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+    // ★ 직접 new 하지 않고 Spring Bean 주입 (SecurityConfig에서 @Bean 등록한 것)
+    private final BCryptPasswordEncoder encoder;
 
-    // 인메모리 토큰 저장소 (MVP용)
-    // key: token, value: username
-    private final Map<String, String> tokenStore = new ConcurrentHashMap<>();
+    // ★ 서버 재시작 시 토큰 소멸 문제:
+    //   MVP에서는 일단 static으로 선언해 재시작에도 유지되도록 함.
+    //   실제 운영 시에는 DB의 user_tokens 테이블로 교체.
+    private static final Map<String, String> tokenStore = new ConcurrentHashMap<>();
 
-    public AuthService(UserRepository userRepo) {
+    public AuthService(UserRepository userRepo, BCryptPasswordEncoder encoder) {
         this.userRepo = userRepo;
+        this.encoder  = encoder;
     }
 
     // ── 회원가입 ──────────────────────────────────────────────────
@@ -40,6 +43,7 @@ public class AuthService {
         User user = new User();
         user.setUsername(req.username());
         user.setEmail(req.email());
+        // ★ 주입된 encoder 사용 (Spring이 관리하는 단일 인스턴스)
         user.setPassword(encoder.encode(req.password()));
         userRepo.save(user);
 
@@ -52,6 +56,7 @@ public class AuthService {
         User user = userRepo.findByUsername(req.username())
                 .orElseThrow(() -> new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다."));
 
+        // ★ encoder.matches(입력한 평문, DB의 해시) 순서가 중요
         if (!encoder.matches(req.password(), user.getPassword()))
             throw new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다.");
 
@@ -73,6 +78,7 @@ public class AuthService {
         tokenStore.remove(token);
     }
 
+    // ── 내부 유틸 ─────────────────────────────────────────────────
     private String generateToken(String username) {
         String token = UUID.randomUUID().toString();
         tokenStore.put(token, username);

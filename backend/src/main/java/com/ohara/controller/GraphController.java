@@ -55,4 +55,13 @@ public class GraphController {
     ) {
         return graphService.search(q, limit);
     }
+
+    @GetMapping("/graph/workspace/{workspaceId}")
+    public GraphResponse getWorkspaceGraph(
+            @PathVariable Long workspaceId,
+            @RequestParam(defaultValue = "100") @Min(10) @Max(500) int limit,
+            @RequestParam(defaultValue = "1")   @Min(1)            int minStrength
+    ) {
+        return graphService.getWorkspaceGraph(workspaceId, limit, minStrength);
+    }
 }

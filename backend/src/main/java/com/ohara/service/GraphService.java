@@ -148,4 +148,53 @@ public class GraphService {
             ));
         }
     }
+    public GraphResponse getWorkspaceGraph(Long workspaceId, int limit, int minStrength) {
+        try (Session s = driver.session()) {
+
+            // 이 워크스페이스의 문서에 언급된 엔티티만 조회
+            // (MENTIONED_IN_WORKSPACE 관계 활용)
+            List<NodeDto> nodes = s.run(
+                    "MATCH (e)-[:MENTIONED_IN_WORKSPACE {workspaceId: $wsId}]->(d:Document) " +
+                            "WHERE e:Country OR e:Organization OR e:Person " +
+                            "WITH e, count(d) AS docCount " +
+                            "OPTIONAL MATCH (e)-[rel:RELATED_TO]-() " +
+                            "WITH e, docCount, count(rel) AS degree " +
+                            "ORDER BY degree DESC LIMIT $limit " +
+                            "RETURN e.name AS name, " +
+                            "       coalesce(e.type, 'Unknown') AS type, " +
+                            "       degree",
+                    Map.of("wsId", workspaceId, "limit", (long) limit)
+            ).list(r -> new NodeDto(
+                    r.get("name").asString(""),
+                    r.get("name").asString(""),
+                    r.get("type").asString("Unknown"),
+                    r.get("degree").asInt(0)
+            ));
+
+            if (nodes.isEmpty())
+                return new GraphResponse(List.of(), List.of(), 0, 0);
+
+            Set<String> names = new HashSet<>();
+            nodes.forEach(n -> names.add(n.name()));
+
+            List<EdgeDto> edges = s.run(
+                    "MATCH (a)-[r:RELATED_TO]-(b) " +
+                            "WHERE a.name IN $names AND b.name IN $names " +
+                            "  AND r.strength >= $min AND id(a) < id(b) " +
+                            "RETURN a.name AS source, b.name AS target, " +
+                            "       r.strength AS strength, r.articleCount AS articleCount, " +
+                            "       coalesce(r.lastMentioned, '') AS lastMentioned " +
+                            "ORDER BY r.strength DESC",
+                    Map.of("names", new ArrayList<>(names), "min", (long) minStrength)
+            ).list(r -> new EdgeDto(
+                    r.get("source").asString(""),
+                    r.get("target").asString(""),
+                    r.get("strength").asInt(0),
+                    r.get("articleCount").asInt(0),
+                    r.get("lastMentioned").asString("")
+            ));
+
+            return new GraphResponse(nodes, edges, nodes.size(), edges.size());
+        }
+    }
 }
