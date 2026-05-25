@@ -13,6 +13,7 @@ function authHeaders() {
 async function req(method, path, body) {
     const res = await fetch(path, {
         method,
+        credentials: 'include',
         headers: authHeaders(),
         body: body ? JSON.stringify(body) : undefined,
     })

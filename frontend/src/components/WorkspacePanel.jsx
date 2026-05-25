@@ -109,6 +109,7 @@ function WorkspaceDetail({ workspace, onBack, onSelectWorkspace }) {
     const [docs,     setDocs]     = useState([])
     const [loading,  setLoading]  = useState(true)
     const [showAdd,  setShowAdd]  = useState(false)
+    const isDefault = workspace.defaultWorkspace || workspace.id === 0
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -145,7 +146,9 @@ function WorkspaceDetail({ workspace, onBack, onSelectWorkspace }) {
                 </button>
                 <div className="flex-1 min-w-0">
                     <h2 className="text-white text-sm font-semibold truncate">{workspace.title}</h2>
-                    <p className="text-white/35 text-xs mt-0.5">{docs.length}개 문서</p>
+                    <p className="text-white/35 text-xs mt-0.5">
+                        {isDefault ? '공유 기본 그래프' : `${docs.length}개 문서`}
+                    </p>
                 </div>
                 {/* 이 워크스페이스 그래프 보기 버튼 */}
                 <button
@@ -159,25 +162,32 @@ function WorkspaceDetail({ workspace, onBack, onSelectWorkspace }) {
             </div>
 
             {/* URL 추가 버튼 */}
-            <div className="px-4 py-3 border-b border-white/5 shrink-0">
-                {showAdd ? (
-                    <AddUrlForm workspaceId={workspace.id} onAdded={handleAdded}/>
-                ) : (
-                    <button
-                        onClick={() => setShowAdd(true)}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-white/20 text-white/45 text-xs hover:text-white/70 hover:border-white/35 hover:bg-white/5 transition-all"
-                    >
-                        <Icon.Link/>
-                        URL 추가
-                    </button>
-                )}
-            </div>
+            {!isDefault && (
+                <div className="px-4 py-3 border-b border-white/5 shrink-0">
+                    {showAdd ? (
+                        <AddUrlForm workspaceId={workspace.id} onAdded={handleAdded}/>
+                    ) : (
+                        <button
+                            onClick={() => setShowAdd(true)}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-white/20 text-white/45 text-xs hover:text-white/70 hover:border-white/35 hover:bg-white/5 transition-all"
+                        >
+                            <Icon.Link/>
+                            URL 추가
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* 문서 목록 */}
             <div className="flex-1 overflow-y-auto">
                 {loading ? (
                     <div className="flex items-center justify-center h-24">
                         <Icon.Spinner/>
+                    </div>
+                ) : isDefault ? (
+                    <div className="flex flex-col items-center justify-center h-32 text-center px-6">
+                        <Icon.Chart/>
+                        <p className="text-white/25 text-xs mt-3">현재 기본 그래프의 모든 노드를 보여줍니다</p>
                     </div>
                 ) : docs.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-32 text-center px-6">
@@ -200,6 +210,7 @@ function WorkspaceCard({ workspace, onSelect, onDelete, onRename }) {
     const [editing, setEditing] = useState(false)
     const [title,   setTitle]   = useState(workspace.title)
     const inputRef = useRef()
+    const isDefault = workspace.defaultWorkspace || workspace.id === 0
 
     useEffect(() => { if (editing) inputRef.current?.focus() }, [editing])
 
@@ -241,25 +252,27 @@ function WorkspaceCard({ workspace, onSelect, onDelete, onRename }) {
                     <p className="text-white/80 text-sm font-medium truncate">{title}</p>
                 )}
                 <p className="text-white/30 text-xs mt-0.5">
-                    {workspace.docCount}개 문서 · {timeStr}
+                    {isDefault ? '공유 기본 그래프' : `${workspace.docCount}개 문서 · ${timeStr}`}
                 </p>
             </div>
 
             {/* 액션 버튼 */}
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                    onClick={e => { e.stopPropagation(); setEditing(true) }}
-                    className="p-1 text-white/30 hover:text-white/60 transition-colors"
-                >
-                    <Icon.Edit/>
-                </button>
-                <button
-                    onClick={e => { e.stopPropagation(); onDelete(workspace.id) }}
-                    className="p-1 text-white/30 hover:text-red-400 transition-colors"
-                >
-                    <Icon.Trash/>
-                </button>
-            </div>
+            {!isDefault && (
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                        onClick={e => { e.stopPropagation(); setEditing(true) }}
+                        className="p-1 text-white/30 hover:text-white/60 transition-colors"
+                    >
+                        <Icon.Edit/>
+                    </button>
+                    <button
+                        onClick={e => { e.stopPropagation(); onDelete(workspace.id) }}
+                        className="p-1 text-white/30 hover:text-red-400 transition-colors"
+                    >
+                        <Icon.Trash/>
+                    </button>
+                </div>
+            )}
         </div>
     )
 }
@@ -314,7 +327,7 @@ export default function WorkspacePanel({ show, onSelectWorkspace }) {
 
     return (
         <div
-            className={`absolute left-0 top-0 bottom-0 z-20 flex transition-all duration-300 ease-in-out
+            className={`absolute left-0 top-0 bottom-0 z-40 flex transition-all duration-300 ease-in-out
                 ${show ? 'translate-x-0' : '-translate-x-full'}`}
             style={{ width: '300px' }}
         >
@@ -335,9 +348,10 @@ export default function WorkspacePanel({ show, onSelectWorkspace }) {
                             <span className="text-white/60 text-sm font-semibold">워크스페이스</span>
                             <button
                                 onClick={() => setCreating(v => !v)}
-                                className="text-white/40 hover:text-white/70 transition-colors p-1"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/15 border border-blue-400/25 text-blue-300 hover:bg-blue-500/25 transition-colors text-xs"
                             >
                                 <Icon.Plus/>
+                                추가
                             </button>
                         </div>
 
@@ -374,7 +388,13 @@ export default function WorkspacePanel({ show, onSelectWorkspace }) {
                                         <Icon.Chart/>
                                     </div>
                                     <p className="text-white/25 text-xs">워크스페이스가 없습니다</p>
-                                    <p className="text-white/15 text-xs mt-1">+ 버튼으로 첫 분석을 시작하세요</p>
+                                    <button
+                                        onClick={() => setCreating(true)}
+                                        className="mt-3 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500/15 border border-blue-400/25 text-blue-300 hover:bg-blue-500/25 transition-colors text-xs"
+                                    >
+                                        <Icon.Plus/>
+                                        워크스페이스 추가
+                                    </button>
                                 </div>
                             ) : (
                                 workspaces.map(ws => (

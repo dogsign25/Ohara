@@ -30,7 +30,7 @@ export default function App({ user, onLogout }) {
   const [edgeFilter,   setEdgeFilter]   = useState('all')
   const [showFilter,     setShowFilter]     = useState(false)
   const [showWorkspace,  setShowWorkspace]  = useState(false)
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null)
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(0)
 
   // ── 그래프 로드 ────────────────────────────────────────────────
   // 워크스페이스 선택 시 해당 워크스페이스 노드만 쿼리
@@ -38,7 +38,7 @@ const loadGraph = useCallback(async () => {
     setLoading(true)
     try {
         let data
-        if (selectedWorkspaceId) {
+        if (selectedWorkspaceId !== null) {
             // 워크스페이스 전용 그래프 (GraphController에 추가 필요)
             data = await api.getWorkspaceGraph(selectedWorkspaceId, limit, minStrength)
         } else {
@@ -83,6 +83,19 @@ useEffect(() => { loadGraph() }, [loadGraph])
       fgRef.current?.centerAt(found.x, found.y, 800)
       fgRef.current?.zoom(3, 800)
     }
+  }
+
+  function handleNodeDeleted(name) {
+    setGraphData(prev => ({
+      nodes: prev.nodes.filter(n => n.id !== name),
+      links: prev.links.filter(link => {
+        const sourceId = typeof link.source === 'object' ? link.source.id : link.source
+        const targetId = typeof link.target === 'object' ? link.target.id : link.target
+        return sourceId !== name && targetId !== name
+      })
+    }))
+    setSelectedNode(null)
+    setHighlight(null)
   }
 
   // ── 노드 그리기 ────────────────────────────────────────────────
@@ -173,9 +186,9 @@ useEffect(() => { loadGraph() }, [loadGraph])
       />
 
       {/* 상단 툴바 */}
-      <div className="absolute top-4 left-4 right-4 flex items-center gap-3 z-30">
+      <div className="absolute top-4 left-4 right-4 flex items-center gap-3 z-30 pointer-events-none">
         {/* 로고 */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 pointer-events-auto">
           <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
             <circle cx="11" cy="11" r="3" fill="#60a5fa"/>
             <circle cx="4"  cy="4"  r="2" fill="#c084fc" opacity="0.8"/>
@@ -190,17 +203,21 @@ useEffect(() => { loadGraph() }, [loadGraph])
           <span className="text-white font-bold tracking-widest text-xs uppercase">OHARA</span>
         </div>
 
-        <SearchBar onSelect={handleSearch}/>
+        <div className="pointer-events-auto">
+          <SearchBar onSelect={handleSearch}/>
+        </div>
 
-        <GraphControls
-          limit={limit} minStrength={minStrength}
-          onLimit={setLimit} onMinStrength={setMinStrength}
-        />
+        <div className="pointer-events-auto">
+          <GraphControls
+            limit={limit} minStrength={minStrength}
+            onLimit={setLimit} onMinStrength={setMinStrength}
+          />
+        </div>
 
         {/* 워크스페이스 토글 */}
         <button
           onClick={() => setShowWorkspace(v => !v)}
-          className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs transition-all ${
+          className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs transition-all pointer-events-auto ${
             showWorkspace
               ? 'bg-white/15 border-white/25 text-white'
               : 'bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10'
@@ -214,7 +231,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
         </button>
 
         {selectedWorkspaceId && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs shrink-0">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs shrink-0 pointer-events-auto">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
             워크스페이스 그래프
             <button
@@ -229,7 +246,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
         {/* 필터 토글 */}
         <button
           onClick={() => setShowFilter(v => !v)}
-          className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs transition-all ${
+          className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs transition-all pointer-events-auto ${
             showFilter
               ? 'bg-white/15 border-white/25 text-white'
               : 'bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10'
@@ -247,7 +264,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
         </span>
 
         {/* 유저 / 로그아웃 */}
-        <div className="ml-auto flex items-center gap-2 shrink-0">
+        <div className="ml-auto flex items-center gap-2 shrink-0 pointer-events-auto">
           {user && (
             <span className="text-white/30 text-xs hidden sm:block">{user}</span>
           )}
@@ -321,6 +338,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
       <ArticlePanel
         selectedNode={selectedNode}
         onClose={() => { setSelectedNode(null); setHighlight(null) }}
+        onDelete={handleNodeDeleted}
       />
     </div>
   )

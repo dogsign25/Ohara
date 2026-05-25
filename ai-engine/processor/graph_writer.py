@@ -10,6 +10,7 @@ CONSTRAINTS = [
     "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Organization) REQUIRE n.name IS UNIQUE",
     "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Person)       REQUIRE n.name IS UNIQUE",
     "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Article)      REQUIRE n.url  IS UNIQUE",
+    "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Document)     REQUIRE n.docId IS UNIQUE",
 ]
 
 
@@ -76,3 +77,46 @@ class GraphWriter:
             except Exception as e:
                 logger.error(f"저장 실패: {e}")
         logger.info(f"저장 완료: {ok}/{len(results)}")
+
+    def write_workspace_document(self, workspace_id: int, doc_id, url: str, title: str, entities):
+        now = datetime.now(timezone.utc).isoformat()
+
+        with self._driver.session() as s:
+            if doc_id is not None:
+                s.run("""
+                    MERGE (d:Document {docId: $docId})
+                    ON CREATE SET d.url=$url, d.title=$title, d.workspaceId=$wsId,
+                                  d.createdAt=$now
+                    ON MATCH  SET d.url=$url, d.title=$title, d.workspaceId=$wsId
+                """, docId=doc_id, url=url, title=title, wsId=workspace_id, now=now)
+            else:
+                s.run("""
+                    MERGE (d:Document {url: $url, workspaceId: $wsId})
+                    ON CREATE SET d.title=$title, d.createdAt=$now
+                    ON MATCH  SET d.title=$title
+                """, url=url, title=title, wsId=workspace_id, now=now)
+
+            for e in entities:
+                s.run(f"""
+                    MERGE (e:{e.etype} {{name: $name}})
+                    ON CREATE SET e.type=$etype, e.createdAt=$now
+                    ON MATCH  SET e.type=$etype
+                    WITH e
+                    MATCH (d:Document)
+                    WHERE ($docId IS NOT NULL AND d.docId = $docId)
+                       OR ($docId IS NULL AND d.url = $url AND d.workspaceId = $wsId)
+                    MERGE (e)-[:MENTIONED_IN_WORKSPACE {{workspaceId: $wsId}}]->(d)
+                """, name=str(e.name), etype=e.etype, docId=doc_id,
+                     url=url, wsId=workspace_id, now=now)
+
+            for x, y in combinations(entities, 2):
+                s.run(f"""
+                    MATCH (a:{x.etype} {{name: $nx}})
+                    MATCH (b:{y.etype} {{name: $ny}})
+                    MERGE (a)-[r:RELATED_TO]-(b)
+                    ON CREATE SET r.strength=1, r.articleCount=1,
+                                  r.firstMentioned=$now, r.lastMentioned=$now
+                    ON MATCH  SET r.strength=r.strength+1,
+                                  r.articleCount=r.articleCount+1,
+                                  r.lastMentioned=$now
+                """, nx=str(x.name), ny=str(y.name), now=now)

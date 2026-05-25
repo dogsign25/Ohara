@@ -22,8 +22,8 @@ export default function Register({ onSuccess, onGoLogin, onGoLanding }) {
       } else {
         setError(res.message || '회원가입 실패')
       }
-    } catch {
-      setError('서버 연결 오류')
+    } catch (err) {
+      setError(err.message || '서버 연결 오류')
     } finally {
       setLoading(false)
     }

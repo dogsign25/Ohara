@@ -9,6 +9,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -63,5 +64,13 @@ public class GraphController {
             @RequestParam(defaultValue = "1")   @Min(1)            int minStrength
     ) {
         return graphService.getWorkspaceGraph(workspaceId, limit, minStrength);
+    }
+
+    @DeleteMapping("/node/{name}")
+    public ResponseEntity<Map<String, String>> deleteNode(@PathVariable String name) {
+        if (!graphService.deleteNode(name)) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(Map.of("message", "삭제 완료"));
     }
 }

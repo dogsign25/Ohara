@@ -23,3 +23,7 @@ spring:
 
 server:
   port: 8080
+
+ohara:
+  ai:
+    url: ${AI_ENGINE_URL:http://localhost:8001}

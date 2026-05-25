@@ -9,6 +9,13 @@ async function get(path, params = {}) {
   return res.json()
 }
 
+async function del(path) {
+  const res = await fetch(`/api${path}`, { method: 'DELETE' })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.message || `API ${res.status}: ${path}`)
+  return data
+}
+
 export const api = {
   /** 전체 그래프 — limit, minStrength로 크기/품질 조절 */
   getGraph(limit = 100, minStrength = 1) {
@@ -24,16 +31,13 @@ export const api = {
   search(q, limit = 10) {
     return get('/search', { q, limit })
   },
+
   // ★ 추가: 워크스페이스 전용 그래프
   getWorkspaceGraph(workspaceId, limit = 100, minStrength = 1) {
       return get(`/graph/workspace/${workspaceId}`, { limit, minStrength })
   },
 
-  getNode(name) {
-      return get(`/node/${encodeURIComponent(name)}`)
-  },
-
-  search(q, limit = 10) {
-      return get('/search', { q, limit })
+  deleteNode(name) {
+    return del(`/node/${encodeURIComponent(name)}`)
   },
 }

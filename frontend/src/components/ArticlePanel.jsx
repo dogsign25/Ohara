@@ -7,9 +7,10 @@ const BADGE = {
   Person:       'bg-purple-500/30 text-purple-200',
 }
 
-export default function ArticlePanel({ selectedNode, onClose }) {
+export default function ArticlePanel({ selectedNode, onClose, onDelete }) {
   const [detail,  setDetail]  = useState(null)
   const [loading, setLoading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!selectedNode) { setDetail(null); return }
@@ -21,6 +22,20 @@ export default function ArticlePanel({ selectedNode, onClose }) {
   }, [selectedNode])
 
   if (!selectedNode) return null
+
+  async function handleDelete() {
+    if (!confirm(`'${selectedNode}' 노드를 삭제할까요? 연결 관계도 함께 삭제됩니다.`)) return
+    setDeleting(true)
+    try {
+      await api.deleteNode(selectedNode)
+      onDelete?.(selectedNode)
+      onClose()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <div className="absolute right-4 top-20 bottom-4 w-80 bg-gray-900/90 backdrop-blur border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl z-40">
@@ -43,11 +58,27 @@ export default function ArticlePanel({ selectedNode, onClose }) {
               </>
           }
         </div>
-        <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="text-white/35 hover:text-red-400 disabled:text-white/15 transition-colors"
+            title="노드 삭제"
+          >
+            {deleting ? (
+              <div className="w-4 h-4 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            )}
+          </button>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* 관련 노드 태그 */}

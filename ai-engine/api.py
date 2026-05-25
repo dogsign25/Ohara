@@ -35,7 +35,11 @@ app = FastAPI(title="OHARA AI Engine")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        origin.strip()
+        for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+        if origin.strip()
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -139,53 +143,8 @@ def _save_to_neo4j(workspace_id: int, doc_id, url: str, title: str, entities):
     - 엔티티 노드는 글로벌 공유 (같은 인물이 여러 워크스페이스에 등장 가능)
     - MENTIONED_IN_WORKSPACE 관계로 워크스페이스 필터링 지원
     """
-    from itertools import combinations
-    from neo4j import GraphDatabase
-    from datetime import datetime, timezone
-
-    now = datetime.now(timezone.utc).isoformat()
-
     try:
-        driver = GraphDatabase.driver(
-            "bolt://localhost:7687",
-            auth=("neo4j", "12345678")
-        )
-        with driver.session() as s:
-            # Document 노드 생성
-            s.run("""
-                MERGE (d:Document {url: $url})
-                ON CREATE SET d.title=$title, d.workspaceId=$wsId,
-                              d.docId=$docId, d.createdAt=$now
-                ON MATCH  SET d.title=$title
-            """, url=url, title=title, wsId=workspace_id,
-                 docId=doc_id, now=now)
-
-            # 엔티티 노드 + MENTIONED_IN_WORKSPACE 관계
-            for e in entities:
-                s.run(f"""
-                    MERGE (e:{e.etype} {{name: $name}})
-                    ON CREATE SET e.type=$etype, e.createdAt=$now
-                    ON MATCH  SET e.type=$etype
-                    WITH e
-                    MATCH (d:Document {{url: $url}})
-                    MERGE (e)-[r:MENTIONED_IN_WORKSPACE {{workspaceId: $wsId}}]->(d)
-                """, name=str(e.name), etype=e.etype,
-                     url=url, wsId=workspace_id, now=now)
-
-            # 엔티티 간 RELATED_TO (글로벌 공유)
-            from itertools import combinations
-            for x, y in combinations(entities, 2):
-                s.run(f"""
-                    MATCH (a:{x.etype} {{name: $nx}})
-                    MATCH (b:{y.etype} {{name: $ny}})
-                    MERGE (a)-[r:RELATED_TO]-(b)
-                    ON CREATE SET r.strength=1, r.articleCount=1,
-                                  r.firstMentioned=$now, r.lastMentioned=$now
-                    ON MATCH  SET r.strength=r.strength+1,
-                                  r.articleCount=r.articleCount+1,
-                                  r.lastMentioned=$now
-                """, nx=str(x.name), ny=str(y.name), now=now)
-        driver.close()
+        writer.write_workspace_document(workspace_id, doc_id, url, title, entities)
     except Exception as e:
         print(f"[Neo4j 저장 실패] {e}")
 

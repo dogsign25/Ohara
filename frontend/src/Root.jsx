@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getToken, getUser, clearAuth, authApi } from './api/auth.js'
+import { getToken, getUser, saveAuth, clearAuth, authApi } from './api/auth.js'
 import Landing from './pages/Landing.jsx'
 import Login from './components/Login.jsx'
 import Register from './components/Register.jsx'
@@ -15,18 +15,26 @@ export default function Root() {
   useEffect(() => {
     const token = getToken()
     const saved = getUser()
-    if (!token || !saved) { setReady(true); return }
+    if (saved) {
+      setUser(saved)
+      setPage('graph')
+    }
 
     authApi.me(token)
       .then(res => {
-        if (res.token) {
-          setUser(saved)
+        if (res.username) {
+          saveAuth(res.token, res.username)
+          setUser(res.username)
           setPage('graph')
-        } else {
+        } else if (!saved) {
           clearAuth()
+          setUser(null)
+          setPage('landing')
         }
       })
-      .catch(() => clearAuth())
+      .catch(() => {
+        if (!saved) clearAuth()
+      })
       .finally(() => setReady(true))
   }, [])
 

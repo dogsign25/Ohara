@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -34,7 +35,10 @@ public class WorkspaceController {
             @RequestHeader(value = "Authorization", required = false) String auth) {
         try {
             List<Workspace> ws = workspaceService.listWorkspaces(extractToken(auth));
-            return ResponseEntity.ok(ws.stream().map(this::toDto).toList());
+            List<Map<String, Object>> response = new ArrayList<>();
+            response.add(defaultWorkspaceDto());
+            response.addAll(ws.stream().map(this::toDto).toList());
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
@@ -91,6 +95,9 @@ public class WorkspaceController {
             @RequestHeader(value = "Authorization", required = false) String auth,
             @PathVariable Long id) {
         try {
+            if (id == 0L) {
+                return ResponseEntity.ok(List.of());
+            }
             List<Document> docs = workspaceService.listDocuments(extractToken(auth), id);
             return ResponseEntity.ok(docs.stream().map(this::toDocDto).toList());
         } catch (Exception e) {
@@ -135,6 +142,17 @@ public class WorkspaceController {
                 "description", ws.getDescription() != null ? ws.getDescription() : "",
                 "docCount",    ws.getDocuments().size(),
                 "updatedAt",   ws.getUpdatedAt().toString()
+        );
+    }
+
+    private Map<String, Object> defaultWorkspaceDto() {
+        return Map.of(
+                "id",          0L,
+                "title",       "Default",
+                "description", "모든 사용자가 공유하는 기본 그래프",
+                "docCount",    0,
+                "defaultWorkspace", true,
+                "updatedAt",   LocalDateTime.now().toString()
         );
     }
 

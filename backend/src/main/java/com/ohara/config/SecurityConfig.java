@@ -23,8 +23,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                // ★ 세션 사용 안 함 (우리는 자체 토큰 방식)
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 // ★ Spring Security의 기본 폼 로그인 비활성화
                 .formLogin(fl -> fl.disable())
                 .httpBasic(hb -> hb.disable())

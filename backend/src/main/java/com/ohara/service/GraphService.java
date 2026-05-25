@@ -149,6 +149,10 @@ public class GraphService {
         }
     }
     public GraphResponse getWorkspaceGraph(Long workspaceId, int limit, int minStrength) {
+        if (workspaceId != null && workspaceId == 0L) {
+            return getGraph(limit, minStrength);
+        }
+
         try (Session s = driver.session()) {
 
             // 이 워크스페이스의 문서에 언급된 엔티티만 조회
@@ -178,14 +182,17 @@ public class GraphService {
             nodes.forEach(n -> names.add(n.name()));
 
             List<EdgeDto> edges = s.run(
-                    "MATCH (a)-[r:RELATED_TO]-(b) " +
+                    "MATCH (a)-[:MENTIONED_IN_WORKSPACE {workspaceId: $wsId}]->(d:Document)" +
+                            "<-[:MENTIONED_IN_WORKSPACE {workspaceId: $wsId}]-(b) " +
+                            "MATCH (a)-[r:RELATED_TO]-(b) " +
                             "WHERE a.name IN $names AND b.name IN $names " +
                             "  AND r.strength >= $min AND id(a) < id(b) " +
+                            "WITH a, b, r, count(DISTINCT d) AS workspaceArticleCount " +
                             "RETURN a.name AS source, b.name AS target, " +
-                            "       r.strength AS strength, r.articleCount AS articleCount, " +
+                            "       r.strength AS strength, workspaceArticleCount AS articleCount, " +
                             "       coalesce(r.lastMentioned, '') AS lastMentioned " +
-                            "ORDER BY r.strength DESC",
-                    Map.of("names", new ArrayList<>(names), "min", (long) minStrength)
+                            "ORDER BY workspaceArticleCount DESC, r.strength DESC",
+                    Map.of("wsId", workspaceId, "names", new ArrayList<>(names), "min", (long) minStrength)
             ).list(r -> new EdgeDto(
                     r.get("source").asString(""),
                     r.get("target").asString(""),
@@ -195,6 +202,30 @@ public class GraphService {
             ));
 
             return new GraphResponse(nodes, edges, nodes.size(), edges.size());
+        }
+    }
+
+    public void deleteWorkspaceDocument(Long workspaceId, Long docId) {
+        try (Session s = driver.session()) {
+            s.run(
+                    "MATCH (d:Document {docId: $docId, workspaceId: $wsId}) " +
+                            "DETACH DELETE d",
+                    Map.of("docId", docId, "wsId", workspaceId)
+            );
+        }
+    }
+
+    public boolean deleteNode(String name) {
+        try (Session s = driver.session()) {
+            var result = s.run(
+                    "MATCH (e {name: $name}) " +
+                            "WHERE e:Country OR e:Organization OR e:Person " +
+                            "WITH collect(e)[0..1] AS nodes " +
+                            "FOREACH (node IN nodes | DETACH DELETE node) " +
+                            "RETURN size(nodes) AS deleted",
+                    Map.of("name", name)
+            );
+            return result.hasNext() && result.next().get("deleted").asInt(0) > 0;
         }
     }
 }

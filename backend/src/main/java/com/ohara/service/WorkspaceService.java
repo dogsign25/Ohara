@@ -8,11 +8,11 @@ import com.ohara.repository.UserRepository;
 import com.ohara.repository.WorkspaceRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class WorkspaceService {
@@ -21,18 +21,21 @@ public class WorkspaceService {
     private final DocumentRepository  documentRepo;
     private final UserRepository      userRepo;
     private final AuthService         authService;
-    // Python AI Engine URL (나중에 application.yml로 옮겨도 됨)
-    private static final String AI_URL = "http://localhost:8001";
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final GraphService        graphService;
+    private final DocumentAnalysisService analysisService;
 
     public WorkspaceService(WorkspaceRepository workspaceRepo,
                             DocumentRepository documentRepo,
                             UserRepository userRepo,
-                            AuthService authService) {
+                            AuthService authService,
+                            GraphService graphService,
+                            DocumentAnalysisService analysisService) {
         this.workspaceRepo = workspaceRepo;
         this.documentRepo  = documentRepo;
         this.userRepo      = userRepo;
         this.authService   = authService;
+        this.graphService  = graphService;
+        this.analysisService = analysisService;
     }
 
     // ── 유저 조회 헬퍼 ────────────────────────────────────────────
@@ -50,7 +53,7 @@ public class WorkspaceService {
     }
 
     // ── 워크스페이스 생성 ─────────────────────────────────────────
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public Workspace createWorkspace(String token, String title, String description) {
         User user = getUserByToken(token);
         if (title == null || title.isBlank())
@@ -64,7 +67,7 @@ public class WorkspaceService {
     }
 
     // ── 워크스페이스 삭제 ─────────────────────────────────────────
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public void deleteWorkspace(String token, Long workspaceId) {
         User user = getUserByToken(token);
         Workspace ws = workspaceRepo.findByIdAndUserId(workspaceId, user.getId())
@@ -73,7 +76,7 @@ public class WorkspaceService {
     }
 
     // ── 워크스페이스 이름 변경 ─────────────────────────────────────
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public Workspace renameWorkspace(String token, Long workspaceId, String newTitle) {
         User user = getUserByToken(token);
         Workspace ws = workspaceRepo.findByIdAndUserId(workspaceId, user.getId())
@@ -93,7 +96,7 @@ public class WorkspaceService {
     }
 
     // ── URL 문서 추가 + 분석 요청 ─────────────────────────────────
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public Document addUrl(String token, Long workspaceId, String url) {
         User user = getUserByToken(token);
         Workspace ws = workspaceRepo.findByIdAndUserId(workspaceId, user.getId())
@@ -108,43 +111,34 @@ public class WorkspaceService {
         doc.setStatus(Document.Status.PENDING);
         Document saved = documentRepo.save(doc);
 
-        // 2) Python AI Engine에 분석 비동기 요청
-        //    지금은 간단히 동기 호출 (나중에 @Async로 교체)
-        try {
-            saved.setStatus(Document.Status.ANALYZING);
-            documentRepo.save(saved);
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> result = restTemplate.postForObject(
-                    AI_URL + "/analyze/url",
-                    Map.of("url", url, "workspace_id", workspaceId, "doc_id", saved.getId()),
-                    Map.class
-            );
-
-            if (result != null) {
-                if (result.containsKey("title"))
-                    saved.setTitle((String) result.get("title"));
-                if (result.containsKey("entity_count"))
-                    saved.setEntityCount((Integer) result.get("entity_count"));
-                saved.setStatus(Document.Status.DONE);
-            }
-        } catch (Exception e) {
-            // AI Engine 미실행 시에도 문서는 저장됨
-            saved.setStatus(Document.Status.ERROR);
-        }
-
         ws.setUpdatedAt(LocalDateTime.now());
         workspaceRepo.save(ws);
+
+        Long docId = saved.getId();
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    analysisService.analyzeUrl(docId, workspaceId, url);
+                }
+            });
+        } else {
+            analysisService.analyzeUrl(docId, workspaceId, url);
+        }
 
         return documentRepo.save(saved);
     }
 
     // ── 문서 삭제 ─────────────────────────────────────────────────
-    @Transactional
+    @Transactional(transactionManager = "transactionManager")
     public void deleteDocument(String token, Long workspaceId, Long docId) {
         User user = getUserByToken(token);
         workspaceRepo.findByIdAndUserId(workspaceId, user.getId())
                 .orElseThrow(() -> new IllegalArgumentException("워크스페이스를 찾을 수 없습니다."));
-        documentRepo.deleteById(docId);
+        Document doc = documentRepo.findById(docId)
+                .filter(d -> d.getWorkspace().getId().equals(workspaceId))
+                .orElseThrow(() -> new IllegalArgumentException("문서를 찾을 수 없습니다."));
+        graphService.deleteWorkspaceDocument(workspaceId, docId);
+        documentRepo.delete(doc);
     }
 }
