@@ -1,14 +1,22 @@
 spacy==3.7.4
+
 feedparser==6.0.11
+
 requests==2.31.0
+
 neo4j==5.19.0
+
 schedule==1.2.1
+
 python-dateutil==2.9.0
 
 # ★ 추가: FastAPI 서버
 fastapi==0.111.0
+
 uvicorn==0.29.0
+
 
 # ★ 추가: URL 텍스트 추출
 beautifulsoup4==4.12.3
+
 lxml==5.2.1
