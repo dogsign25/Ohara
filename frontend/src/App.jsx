@@ -178,6 +178,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
 
       <WorkspacePanel
           show={showWorkspace}
+          onClose={() => setShowWorkspace(false)}
           onSelectWorkspace={(wsId) => {
               setSelectedWorkspaceId(wsId)
               setSelectedNode(null)

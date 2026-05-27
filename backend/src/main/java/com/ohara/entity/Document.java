@@ -5,9 +5,16 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "documents")
+/**
+ * 워크스페이스에 추가된 문서 row입니다.
+ * URL/PDF/NOTE 타입을 구분하고, AI 분석 진행 상태와 추출된 엔티티 수를 저장합니다.
+ */
 public class Document {
 
+    /** 문서 입력 형식입니다. 현재 UI는 URL 추가를 중심으로 사용합니다. */
     public enum DocType { URL, PDF, NOTE }
+
+    /** AI 분석 생명주기입니다. PENDING에서 시작해 ANALYZING 이후 DONE 또는 ERROR로 끝납니다. */
     public enum Status  { PENDING, ANALYZING, DONE, ERROR }
 
     @Id

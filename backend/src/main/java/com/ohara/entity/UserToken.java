@@ -5,6 +5,10 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "user_tokens")
+/**
+ * 발급된 로그인 토큰을 저장하는 엔티티입니다.
+ * 서버 재시작 후에도 Authorization Bearer 토큰을 검증할 수 있도록 User와 연결합니다.
+ */
 public class UserToken {
 
     @Id

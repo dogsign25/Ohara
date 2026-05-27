@@ -1,6 +1,6 @@
 package com.ohara.controller;
 
-import com.ohara.model.Dto.*;
+import com.ohara.model.GraphDto.*;
 import com.ohara.service.GraphService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -23,7 +23,11 @@ public class GraphController {
         this.graphService = graphService;
     }
 
-    // GET /api/graph?limit=100&minStrength=1
+    /**
+     * GET /api/graph?limit=100&minStrength=1
+     * Neo4j의 전체 엔티티 그래프를 조회합니다.
+     * limit은 노드 수를 제한하고 minStrength는 약한 RELATED_TO 관계를 필터링합니다.
+     */
     @GetMapping("/graph")
     public GraphResponse getGraph(
         @RequestParam(defaultValue = "100") @Min(10) @Max(500) int limit,
@@ -32,7 +36,10 @@ public class GraphController {
         return graphService.getGraph(limit, minStrength);
     }
 
-    // GET /api/node/{name}
+    /**
+     * GET /api/node/{name}
+     * 특정 엔티티 노드의 타입, 연결 수, 관련 노드, 최근 기사를 조회합니다.
+     */
     @GetMapping("/node/{name}")
     public ResponseEntity<NodeDetailDto> getNode(@PathVariable String name) {
         return graphService.getNodeDetail(name)
@@ -40,7 +47,10 @@ public class GraphController {
             .orElse(ResponseEntity.notFound().build());
     }
 
-    // GET /api/node/{name}/articles
+    /**
+     * GET /api/node/{name}/articles
+     * 노드 상세 응답 중 recentArticles만 별도 API 형태로 제공합니다.
+     */
     @GetMapping("/node/{name}/articles")
     public ResponseEntity<List<ArticleDto>> getArticles(@PathVariable String name) {
         return graphService.getNodeDetail(name)
@@ -48,7 +58,10 @@ public class GraphController {
             .orElse(ResponseEntity.notFound().build());
     }
 
-    // GET /api/search?q=NATO
+    /**
+     * GET /api/search?q=NATO
+     * 검색창 자동완성을 위한 엔티티 이름 부분 검색입니다.
+     */
     @GetMapping("/search")
     public List<NodeDto> search(
         @RequestParam String q,
@@ -57,6 +70,11 @@ public class GraphController {
         return graphService.search(q, limit);
     }
 
+    /**
+     * GET /api/graph/workspace/{workspaceId}
+     * 특정 워크스페이스 문서에 언급된 엔티티 그래프를 조회합니다.
+     * workspaceId가 0이면 모든 사용자가 공유하는 Default 그래프로 보고 전체 그래프를 반환합니다.
+     */
     @GetMapping("/graph/workspace/{workspaceId}")
     public GraphResponse getWorkspaceGraph(
             @PathVariable Long workspaceId,
@@ -66,6 +84,10 @@ public class GraphController {
         return graphService.getWorkspaceGraph(workspaceId, limit, minStrength);
     }
 
+    /**
+     * DELETE /api/node/{name}
+     * Neo4j의 엔티티 노드를 삭제합니다. DETACH DELETE를 사용하므로 연결 관계도 함께 제거됩니다.
+     */
     @DeleteMapping("/node/{name}")
     public ResponseEntity<Map<String, String>> deleteNode(@PathVariable String name) {
         if (!graphService.deleteNode(name)) {

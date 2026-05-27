@@ -13,6 +13,7 @@ const Icon = {
     Globe:   () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>,
     Spinner: () => <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white/70 rounded-full animate-spin"/>,
     Chart:   () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>,
+    Collapse: () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7M20 19l-7-7 7-7"/></svg>,
 }
 
 // 상태 색상
@@ -105,7 +106,7 @@ function AddUrlForm({ workspaceId, onAdded }) {
 }
 
 // ── 워크스페이스 상세 (문서 목록) ───────────────────────────────────
-function WorkspaceDetail({ workspace, onBack, onSelectWorkspace }) {
+function WorkspaceDetail({ workspace, onBack, onClose, onSelectWorkspace }) {
     const [docs,     setDocs]     = useState([])
     const [loading,  setLoading]  = useState(true)
     const [showAdd,  setShowAdd]  = useState(false)
@@ -141,6 +142,7 @@ function WorkspaceDetail({ workspace, onBack, onSelectWorkspace }) {
                 <button
                     onClick={onBack}
                     className="text-white/40 hover:text-white/70 transition-colors"
+                    title="목록으로"
                 >
                     <Icon.Back/>
                 </button>
@@ -158,6 +160,13 @@ function WorkspaceDetail({ workspace, onBack, onSelectWorkspace }) {
                 >
                     <Icon.Chart/>
                     그래프
+                </button>
+                <button
+                    onClick={onClose}
+                    className="p-1.5 rounded-lg text-white/35 hover:text-white/70 hover:bg-white/5 transition-colors"
+                    title="워크스페이스 접기"
+                >
+                    <Icon.Collapse/>
                 </button>
             </div>
 
@@ -278,7 +287,7 @@ function WorkspaceCard({ workspace, onSelect, onDelete, onRename }) {
 }
 
 // ── 메인 패널 ────────────────────────────────────────────────────────
-export default function WorkspacePanel({ show, onSelectWorkspace }) {
+export default function WorkspacePanel({ show, onClose, onSelectWorkspace }) {
     const [workspaces,   setWorkspaces]   = useState([])
     const [selected,     setSelected]     = useState(null) // Workspace 객체
     const [loading,      setLoading]      = useState(true)
@@ -338,6 +347,7 @@ export default function WorkspacePanel({ show, onSelectWorkspace }) {
                     <WorkspaceDetail
                         workspace={selected}
                         onBack={() => setSelected(null)}
+                        onClose={onClose}
                         onSelectWorkspace={onSelectWorkspace}
                     />
                 ) : (
@@ -346,13 +356,22 @@ export default function WorkspacePanel({ show, onSelectWorkspace }) {
                         {/* 헤더 */}
                         <div className="flex items-center justify-between px-4 py-4 border-b border-white/10 shrink-0">
                             <span className="text-white/60 text-sm font-semibold">워크스페이스</span>
-                            <button
-                                onClick={() => setCreating(v => !v)}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/15 border border-blue-400/25 text-blue-300 hover:bg-blue-500/25 transition-colors text-xs"
-                            >
-                                <Icon.Plus/>
-                                추가
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setCreating(v => !v)}
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/15 border border-blue-400/25 text-blue-300 hover:bg-blue-500/25 transition-colors text-xs"
+                                >
+                                    <Icon.Plus/>
+                                    추가
+                                </button>
+                                <button
+                                    onClick={onClose}
+                                    className="p-1.5 rounded-lg text-white/35 hover:text-white/70 hover:bg-white/5 transition-colors"
+                                    title="워크스페이스 접기"
+                                >
+                                    <Icon.Collapse/>
+                                </button>
+                            </div>
                         </div>
 
                         {/* 새 워크스페이스 입력 */}

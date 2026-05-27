@@ -2,8 +2,9 @@ package com.ohara.model;
 
 import java.util.List;
 
-public class Dto {
+public class GraphDto {
 
+    /** 그래프에 표시되는 엔티티 노드입니다. */
     public record NodeDto(
         String id,
         String name,
@@ -11,6 +12,7 @@ public class Dto {
         int    degree  // 연결 수 (노드 크기 결정)
     ) {}
 
+    /** 그래프에 표시되는 엔티티 간 관계입니다. */
     public record EdgeDto(
         String source,
         String target,
@@ -19,6 +21,7 @@ public class Dto {
         String lastMentioned
     ) {}
 
+    /** 노드 상세 패널에 표시되는 기사 정보입니다. */
     public record ArticleDto(
         String title,
         String url,
@@ -26,6 +29,7 @@ public class Dto {
         String publishedAt
     ) {}
 
+    /** 그래프 화면이 한 번에 소비하는 노드/엣지 묶음입니다. */
     public record GraphResponse(
         List<NodeDto> nodes,
         List<EdgeDto> edges,
@@ -33,6 +37,7 @@ public class Dto {
         int           totalEdges
     ) {}
 
+    /** 특정 노드를 클릭했을 때 오른쪽 상세 패널에 표시되는 정보입니다. */
     public record NodeDetailDto(
         String           name,
         String           type,

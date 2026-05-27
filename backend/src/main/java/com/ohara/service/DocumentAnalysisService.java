@@ -23,6 +23,11 @@ public class DocumentAnalysisService {
         this.aiUrl = aiUrl;
     }
 
+    /**
+     * URL 문서를 백그라운드에서 분석합니다.
+     * 문서 상태를 ANALYZING으로 바꾼 뒤 Python AI Engine에 URL, workspaceId, docId를 전달합니다.
+     * 최대 3회 시도하며 성공하면 제목/엔티티 수를 저장하고 DONE, 모두 실패하면 ERROR로 마칩니다.
+     */
     @Async
     @Transactional(transactionManager = "transactionManager")
     public void analyzeUrl(Long docId, Long workspaceId, String url) {

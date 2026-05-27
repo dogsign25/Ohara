@@ -5,6 +5,10 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
+/**
+ * 로그인 가능한 사용자 계정입니다.
+ * username/email은 중복을 허용하지 않고, password에는 BCrypt 해시만 저장합니다.
+ */
 public class User {
 
     @Id

@@ -35,7 +35,11 @@ public class AuthService {
         this.encoder  = encoder;
     }
 
-    // ── 회원가입 ──────────────────────────────────────────────────
+    /**
+     * 회원가입 요청을 검증하고 사용자를 생성합니다.
+     * username/email은 앞뒤 공백을 제거해 저장하며, 비밀번호는 BCrypt 해시로 저장합니다.
+     * 성공 시 로그인 토큰을 즉시 발급해 가입 후 바로 로그인된 상태로 진입할 수 있게 합니다.
+     */
     public AuthDto.AuthResponse register(AuthDto.RegisterRequest req) {
         if (req.username() == null || req.username().isBlank())
             throw new IllegalArgumentException("아이디를 입력해주세요.");
@@ -62,7 +66,10 @@ public class AuthService {
         return new AuthDto.AuthResponse(token, username, "회원가입 성공");
     }
 
-    // ── 로그인 ────────────────────────────────────────────────────
+    /**
+     * 로그인 요청을 검증합니다.
+     * DB에 저장된 BCrypt 해시와 입력 비밀번호를 비교하고 성공 시 새 토큰을 발급합니다.
+     */
     public AuthDto.AuthResponse login(AuthDto.LoginRequest req) {
         if (req.username() == null || req.username().isBlank() || req.password() == null)
             throw new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다.");
@@ -79,7 +86,10 @@ public class AuthService {
         return new AuthDto.AuthResponse(token, req.username(), "로그인 성공");
     }
 
-    // ── 토큰 검증 ─────────────────────────────────────────────────
+    /**
+     * 토큰이 현재 유효한지 확인합니다.
+     * 우선 메모리 fallback 저장소를 확인하고, 없으면 MySQL user_tokens 테이블을 조회합니다.
+     */
     public boolean validateToken(String token) {
         if (token == null) return false;
         if (fallbackTokenStore.containsKey(token)) return true;
@@ -91,6 +101,10 @@ public class AuthService {
         }
     }
 
+    /**
+     * 토큰에서 username을 복원합니다.
+     * UserToken.user는 LAZY 관계이므로 JPA 트랜잭션 안에서 조회해 LazyInitialization 문제를 피합니다.
+     */
     @Transactional(transactionManager = "transactionManager", readOnly = true)
     public String getUsernameFromToken(String token) {
         String fallbackUsername = fallbackTokenStore.get(token);
@@ -106,7 +120,10 @@ public class AuthService {
         }
     }
 
-    // ── 로그아웃 ──────────────────────────────────────────────────
+    /**
+     * 로그아웃 시 fallback 저장소와 DB 토큰을 모두 정리합니다.
+     * DB 토큰 삭제 실패는 로그로 남기고 요청 자체는 실패시키지 않습니다.
+     */
     public void logout(String token) {
         fallbackTokenStore.remove(token);
         try {
@@ -118,7 +135,10 @@ public class AuthService {
         }
     }
 
-    // ── 내부 유틸 ─────────────────────────────────────────────────
+    /**
+     * UUID 기반 로그인 토큰을 생성하고 user_tokens 테이블에 저장합니다.
+     * 토큰 DB 저장에 실패해도 로그인 흐름이 완전히 깨지지 않도록 메모리 fallback에 저장합니다.
+     */
     private String generateToken(User user) {
         String token = UUID.randomUUID().toString();
         UserToken userToken = new UserToken();

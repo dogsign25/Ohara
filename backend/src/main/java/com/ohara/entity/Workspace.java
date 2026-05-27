@@ -7,6 +7,10 @@ import java.util.List;
 
 @Entity
 @Table(name = "workspaces")
+/**
+ * 사용자가 만든 워크스페이스입니다.
+ * 각 워크스페이스는 한 사용자에게 속하고 여러 Document를 가질 수 있습니다.
+ */
 public class Workspace {
 
     @Id

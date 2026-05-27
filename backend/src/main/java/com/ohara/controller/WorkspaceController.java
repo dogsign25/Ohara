@@ -22,14 +22,21 @@ public class WorkspaceController {
         this.workspaceService = workspaceService;
     }
 
-    // 토큰 추출 헬퍼
+    /**
+     * Authorization 헤더에서 Bearer 토큰만 잘라냅니다.
+     * 워크스페이스 API는 사용자 소유권 검사가 필요하므로 토큰이 없으면 즉시 예외를 던집니다.
+     */
     private String extractToken(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer "))
             throw new IllegalStateException("인증이 필요합니다.");
         return authHeader.substring(7);
     }
 
-    // ── GET /api/workspaces → 내 워크스페이스 목록
+    /**
+     * GET /api/workspaces
+     * 로그인 사용자의 워크스페이스 목록을 반환합니다.
+     * 실제 DB row가 아닌 시스템 Default 워크스페이스(id=0)를 항상 첫 항목으로 합성해 추가합니다.
+     */
     @GetMapping
     public ResponseEntity<?> list(
             @RequestHeader(value = "Authorization", required = false) String auth) {
@@ -44,7 +51,10 @@ public class WorkspaceController {
         }
     }
 
-    // ── POST /api/workspaces → 워크스페이스 생성
+    /**
+     * POST /api/workspaces
+     * 로그인 사용자 소유의 새 워크스페이스를 생성합니다.
+     */
     @PostMapping
     public ResponseEntity<?> create(
             @RequestHeader(value = "Authorization", required = false) String auth,
@@ -61,7 +71,10 @@ public class WorkspaceController {
         }
     }
 
-    // ── DELETE /api/workspaces/{id} → 삭제
+    /**
+     * DELETE /api/workspaces/{id}
+     * 워크스페이스 소유권을 확인한 뒤 MySQL 워크스페이스와 하위 문서를 삭제합니다.
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(
             @RequestHeader(value = "Authorization", required = false) String auth,
@@ -74,7 +87,10 @@ public class WorkspaceController {
         }
     }
 
-    // ── PATCH /api/workspaces/{id} → 이름 변경
+    /**
+     * PATCH /api/workspaces/{id}
+     * 워크스페이스 소유권을 확인한 뒤 제목을 변경합니다.
+     */
     @PatchMapping("/{id}")
     public ResponseEntity<?> rename(
             @RequestHeader(value = "Authorization", required = false) String auth,
@@ -89,7 +105,11 @@ public class WorkspaceController {
         }
     }
 
-    // ── GET /api/workspaces/{id}/documents → 문서 목록
+    /**
+     * GET /api/workspaces/{id}/documents
+     * 워크스페이스 문서 목록을 조회합니다.
+     * Default 워크스페이스(id=0)는 실제 문서 row를 갖지 않으므로 빈 배열을 반환합니다.
+     */
     @GetMapping("/{id}/documents")
     public ResponseEntity<?> listDocs(
             @RequestHeader(value = "Authorization", required = false) String auth,
@@ -105,7 +125,10 @@ public class WorkspaceController {
         }
     }
 
-    // ── POST /api/workspaces/{id}/documents → URL 추가
+    /**
+     * POST /api/workspaces/{id}/documents
+     * URL 문서를 MySQL에 PENDING 상태로 저장하고 비동기 AI 분석을 시작합니다.
+     */
     @PostMapping("/{id}/documents")
     public ResponseEntity<?> addDoc(
             @RequestHeader(value = "Authorization", required = false) String auth,
@@ -120,7 +143,10 @@ public class WorkspaceController {
         }
     }
 
-    // ── DELETE /api/workspaces/{wsId}/documents/{docId} → 문서 삭제
+    /**
+     * DELETE /api/workspaces/{wsId}/documents/{docId}
+     * MySQL 문서와 Neo4j의 대응 Document 노드를 함께 삭제합니다.
+     */
     @DeleteMapping("/{wsId}/documents/{docId}")
     public ResponseEntity<?> deleteDoc(
             @RequestHeader(value = "Authorization", required = false) String auth,
@@ -134,7 +160,9 @@ public class WorkspaceController {
         }
     }
 
-    // ── DTO 변환 ─────────────────────────────────────────────────
+    /**
+     * Workspace 엔티티를 프론트엔드가 쓰는 단순 Map DTO로 변환합니다.
+     */
     private Map<String, Object> toDto(Workspace ws) {
         return Map.of(
                 "id",          ws.getId(),
@@ -145,6 +173,10 @@ public class WorkspaceController {
         );
     }
 
+    /**
+     * 모든 사용자가 공유하는 시스템 워크스페이스 DTO를 만듭니다.
+     * DB에 저장하지 않는 가상 워크스페이스이며, id=0으로 식별합니다.
+     */
     private Map<String, Object> defaultWorkspaceDto() {
         return Map.of(
                 "id",          0L,
@@ -156,6 +188,9 @@ public class WorkspaceController {
         );
     }
 
+    /**
+     * Document 엔티티를 문서 패널 표시용 DTO로 변환합니다.
+     */
     private Map<String, Object> toDocDto(Document doc) {
         return Map.of(
                 "id",          doc.getId(),

@@ -38,7 +38,10 @@ public class WorkspaceService {
         this.analysisService = analysisService;
     }
 
-    // ── 유저 조회 헬퍼 ────────────────────────────────────────────
+    /**
+     * 토큰에서 현재 사용자를 복원합니다.
+     * 모든 워크스페이스 작업은 이 메서드를 통해 사용자 소유권 검사의 기준 User를 얻습니다.
+     */
     private User getUserByToken(String token) {
         String username = authService.getUsernameFromToken(token);
         if (username == null) throw new IllegalStateException("인증이 필요합니다.");
@@ -46,13 +49,18 @@ public class WorkspaceService {
                 .orElseThrow(() -> new IllegalStateException("유저를 찾을 수 없습니다."));
     }
 
-    // ── 워크스페이스 목록 ─────────────────────────────────────────
+    /**
+     * 로그인 사용자의 워크스페이스 목록을 최신 수정일순으로 조회합니다.
+     */
     public List<Workspace> listWorkspaces(String token) {
         User user = getUserByToken(token);
         return workspaceRepo.findByUserIdOrderByUpdatedAtDesc(user.getId());
     }
 
-    // ── 워크스페이스 생성 ─────────────────────────────────────────
+    /**
+     * 새 워크스페이스를 생성합니다.
+     * JPA와 Neo4j 트랜잭션 매니저가 모두 존재하므로 MySQL 작업에는 transactionManager를 명시합니다.
+     */
     @Transactional(transactionManager = "transactionManager")
     public Workspace createWorkspace(String token, String title, String description) {
         User user = getUserByToken(token);
@@ -66,7 +74,10 @@ public class WorkspaceService {
         return workspaceRepo.save(ws);
     }
 
-    // ── 워크스페이스 삭제 ─────────────────────────────────────────
+    /**
+     * 워크스페이스 소유권을 확인한 뒤 삭제합니다.
+     * Workspace.documents에 orphanRemoval이 설정되어 있어 MySQL 문서 row도 함께 삭제됩니다.
+     */
     @Transactional(transactionManager = "transactionManager")
     public void deleteWorkspace(String token, Long workspaceId) {
         User user = getUserByToken(token);
@@ -75,7 +86,9 @@ public class WorkspaceService {
         workspaceRepo.delete(ws);
     }
 
-    // ── 워크스페이스 이름 변경 ─────────────────────────────────────
+    /**
+     * 워크스페이스 제목을 변경하고 updatedAt을 현재 시각으로 갱신합니다.
+     */
     @Transactional(transactionManager = "transactionManager")
     public Workspace renameWorkspace(String token, Long workspaceId, String newTitle) {
         User user = getUserByToken(token);
@@ -86,7 +99,9 @@ public class WorkspaceService {
         return workspaceRepo.save(ws);
     }
 
-    // ── 문서 목록 ─────────────────────────────────────────────────
+    /**
+     * 워크스페이스 소유권을 확인한 뒤 문서 목록을 업로드 최신순으로 반환합니다.
+     */
     public List<Document> listDocuments(String token, Long workspaceId) {
         User user = getUserByToken(token);
         // 소유권 확인
@@ -95,7 +110,11 @@ public class WorkspaceService {
         return documentRepo.findByWorkspaceIdOrderByUploadedAtDesc(workspaceId);
     }
 
-    // ── URL 문서 추가 + 분석 요청 ─────────────────────────────────
+    /**
+     * URL 문서를 추가하고 분석 작업을 예약합니다.
+     * 문서 row가 커밋된 뒤 AI Engine을 호출해야 비동기 작업이 문서를 안정적으로 다시 조회할 수 있으므로
+     * TransactionSynchronization.afterCommit에서 analyzeUrl을 호출합니다.
+     */
     @Transactional(transactionManager = "transactionManager")
     public Document addUrl(String token, Long workspaceId, String url) {
         User user = getUserByToken(token);
@@ -129,7 +148,9 @@ public class WorkspaceService {
         return documentRepo.save(saved);
     }
 
-    // ── 문서 삭제 ─────────────────────────────────────────────────
+    /**
+     * 문서 소유권을 확인한 뒤 MySQL 문서와 Neo4j Document 노드를 함께 삭제합니다.
+     */
     @Transactional(transactionManager = "transactionManager")
     public void deleteDocument(String token, Long workspaceId, Long docId) {
         User user = getUserByToken(token);

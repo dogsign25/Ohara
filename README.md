@@ -1,242 +1,151 @@
-# OHARA — World Relationship Intelligence Engine
+# OHARA
 
-뉴스를 수집해 국가·기관·인물 간 관계를 인터랙티브 그래프로 시각화하는 OSINT 플랫폼.
+OHARA는 뉴스/URL 문서에서 국가, 기관, 인물 엔티티를 추출하고 Neo4j 그래프로 시각화하는 관계 분석 애플리케이션입니다. Spring Boot 백엔드는 인증, 워크스페이스, MySQL 저장, Neo4j 조회를 담당하고, Python AI Engine은 URL 본문 수집과 NER 분석, 그래프 저장을 담당합니다. React 프론트엔드는 그래프 탐색과 워크스페이스 문서 관리를 제공합니다.
 
----
+## 실행 방법
 
-## 사전 준비
-
-아래 항목이 설치되어 있어야 합니다.
-
-| 항목 | 버전 | 확인 명령어 |
-|------|------|-------------|
-| Java | 21 이상 | `java -version` |
-| Maven | 3.9 이상 | `mvn -version` |
-| Python | 3.12 이상 | `python3 --version` |
-| Node.js | 20 이상 | `node -v` |
-| Neo4j Desktop | 최신 | — |
-
----
-
-## 1단계 — Neo4j 실행
-
-1. [Neo4j Desktop](https://neo4j.com/download/) 설치 후 실행
-2. **New Project → Add Database → Create a Local Database** 클릭
-3. 설정값 입력:
-   - Name: `ohara`
-   - Password: `ohara1234`
-4. **Start** 버튼 클릭 → 상태가 `Running`이 될 때까지 대기
-5. 브라우저로 확인: http://localhost:7474
-   - Username: `neo4j`
-   - Password: `ohara1234`
-
-> Neo4j가 실행 중이 아니면 Python 엔진과 Spring Boot 모두 연결에 실패합니다.
-
----
-
-## 2단계 — Python NLP 엔진 실행
-
-터미널 1에서 실행합니다.
+1. MySQL과 Neo4j를 실행합니다.
+2. 백엔드를 실행합니다.
 
 ```bash
-cd ohara/ai-engine
-
-# 가상환경 생성 (처음 한 번만)
-python3 -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-
-# 패키지 설치 (처음 한 번만)
-pip install -r requirements.txt
-python -m spacy download en_core_web_lg
-
-# Phase 1 확인 — Neo4j 없이 추출 결과만 콘솔로 출력
-python debug_run.py
-
-# 정상 확인 후 실제 파이프라인 실행 (5분마다 수집)
-python main.py
+cd backend
+./gradlew bootRun
 ```
 
-실행되면 다음과 같은 로그가 출력됩니다:
-
-```
-2024-xx-xx [INFO] ohara: OHARA NLP Engine 시작 (주기: 300초)
-2024-xx-xx [INFO] ohara: === 파이프라인 시작 ===
-2024-xx-xx [INFO] crawler.collector: [Reuters] 30개 수집
-2024-xx-xx [INFO] crawler.collector: [BBC] 25개 수집
-...
-2024-xx-xx [INFO] ohara: 추출: 180개 엔티티
-2024-xx-xx [INFO] ohara: 저장 완료: 82/95
-2024-xx-xx [INFO] ohara: === 파이프라인 완료 ===
-```
-
-> **첫 실행 후 최소 1분 기다린 뒤** 3단계로 넘어가세요.
-> Neo4j 브라우저(http://localhost:7474)에서 `MATCH (n) RETURN n LIMIT 50` 을 실행해 노드가 생성됐는지 확인할 수 있습니다.
-
----
-
-## 3단계 — Spring Boot API 실행
-
-터미널 2에서 실행합니다.
+3. AI Engine을 실행합니다.
 
 ```bash
-cd ohara/backend
-
-# 빌드 + 실행 (처음엔 Maven이 의존성 다운로드하므로 2~3분 걸림)
-mvn spring-boot:run
+cd ai-engine
+uvicorn api:app --port 8001 --reload
 ```
 
-실행되면 다음 로그가 보입니다:
-
-```
-Started OharaApplication in 3.2 seconds (JVM running for 3.8)
-```
-
-API 동작 확인:
+4. 프론트엔드를 실행합니다.
 
 ```bash
-curl http://localhost:8080/api/graph?limit=50
-# → {"nodes":[...],"edges":[...],"totalNodes":50,"totalEdges":120}
-```
-
----
-
-## 4단계 — React 프론트엔드 실행
-
-터미널 3에서 실행합니다.
-
-```bash
-cd ohara/frontend
-
-# 패키지 설치 (처음 한 번만)
+cd frontend
 npm install
-
-# 개발 서버 실행
 npm run dev
 ```
 
-브라우저에서 http://localhost:3000 접속
+5. 브라우저에서 `http://localhost:3000`을 엽니다.
 
----
+## 주요 설정
 
-## 전체 실행 순서 요약
+`backend/src/main/resources/application.yml`
 
-```
-Neo4j Desktop 시작
-       ↓
-터미널 1:  cd ai-engine && python main.py
-       ↓  (1분 대기)
-터미널 2:  cd backend   && mvn spring-boot:run
-       ↓
-터미널 3:  cd frontend  && npm run dev
-       ↓
-브라우저:  http://localhost:3000
-```
+- `DB_URL`, `DB_USER`, `DB_PASSWORD`: MySQL 연결 정보
+- `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`: Neo4j 연결 정보
+- `AI_ENGINE_URL`: Spring Boot가 호출할 Python AI Engine 주소
 
----
+`ai-engine/api.py`
 
-## API 엔드포인트
+- `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`: AI Engine의 Neo4j 저장 연결 정보
+- `CORS_ALLOWED_ORIGINS`: AI Engine CORS 허용 origin
 
-| 메서드 | URL | 설명 |
-|--------|-----|------|
-| GET | `/api/graph?limit=100&minStrength=1` | 전체 그래프 |
-| GET | `/api/node/{name}` | 노드 상세 + 관련 기사 |
-| GET | `/api/node/{name}/articles` | 관련 기사만 |
-| GET | `/api/search?q=NATO&limit=10` | 검색 자동완성 |
+## 요청 흐름
 
-**파라미터 설명**
-- `limit`: 반환할 최대 노드 수 (기본 100, 최대 500). 너무 높으면 브라우저가 느려집니다.
-- `minStrength`: 이 값 이상의 공동 등장 횟수를 가진 관계만 표시 (기본 1, 높일수록 강한 관계만).
+### 회원가입/로그인
 
----
+1. 프론트엔드가 `/api/auth/register` 또는 `/api/auth/login`으로 요청합니다.
+2. `AuthController`가 요청을 받고 `AuthService`에 위임합니다.
+3. `AuthService`는 MySQL `users` 테이블에서 계정을 생성하거나 비밀번호를 검증합니다.
+4. 성공 시 UUID 토큰을 생성하고 `user_tokens` 테이블에 저장합니다.
+5. 동시에 Spring `HttpSession`에도 `username`, `token`을 저장합니다.
+6. 새로고침 시 프론트엔드는 `/api/auth/me`를 호출하고, 백엔드는 세션 또는 토큰으로 로그인 상태를 복원합니다.
 
-## 프로젝트 구조
+### 전체 그래프 조회
 
-```
-ohara/
-├── README.md
-│
-├── ai-engine/                  # Python NLP 파이프라인
-│   ├── main.py                 # 진입점 (스케줄러)
-│   ├── debug_run.py            # Phase 1 확인용
-│   ├── requirements.txt
-│   ├── crawler/
-│   │   └── collector.py        # RSS 수집
-│   ├── nlp/
-│   │   ├── normalizer.py       # 엔티티 정규화 (alias 테이블)
-│   │   └── extractor.py        # spaCy NER
-│   └── processor/
-│       └── graph_writer.py     # Neo4j MERGE + strength 누적
-│
-├── backend/                    # Spring Boot API
-│   ├── pom.xml
-│   └── src/main/
-│       ├── java/com/ohara/
-│       │   ├── OharaApplication.java
-│       │   ├── controller/GraphController.java
-│       │   ├── service/GraphService.java
-│       │   └── model/Dto.java
-│       └── resources/
-│           └── application.yml
-│
-└── frontend/                   # React (JSX)
-    ├── package.json
-    ├── vite.config.js
-    ├── index.html
-    └── src/
-        ├── main.jsx
-        ├── App.jsx
-        ├── api/client.js
-        └── components/
-            ├── SearchBar.jsx
-            ├── ArticlePanel.jsx
-            └── GraphControls.jsx
-```
+1. 프론트엔드가 `/api/graph?limit=100&minStrength=1`로 요청합니다.
+2. `GraphController`가 `GraphService.getGraph()`를 호출합니다.
+3. `GraphService`가 Neo4j에서 `Country`, `Organization`, `Person` 노드와 `RELATED_TO` 관계를 조회합니다.
+4. 프론트엔드는 응답을 `react-force-graph-2d`에 넘겨 시각화합니다.
 
----
+### 워크스페이스 그래프 조회
 
-## 자주 겪는 문제
+1. 프론트엔드가 `/api/graph/workspace/{workspaceId}`로 요청합니다.
+2. `workspaceId`가 `0`이면 모두가 공유하는 `Default` 워크스페이스로 처리하며 전체 그래프를 반환합니다.
+3. 일반 워크스페이스는 `MENTIONED_IN_WORKSPACE {workspaceId}` 관계가 있는 엔티티만 조회합니다.
+4. 엣지는 같은 워크스페이스 문서에서 함께 언급된 엔티티 사이만 반환합니다.
 
-**Python — `ModuleNotFoundError`**
-```bash
-# 가상환경이 활성화됐는지 확인
-source venv/bin/activate
-```
+### URL 문서 추가 및 분석
 
-**Python — `en_core_web_lg` 없음**
-```bash
-python -m spacy download en_core_web_lg
-```
+1. 프론트엔드가 `/api/workspaces/{id}/documents`로 URL을 POST합니다.
+2. `WorkspaceController`가 `WorkspaceService.addUrl()`을 호출합니다.
+3. `WorkspaceService`는 MySQL `documents`에 `PENDING` 문서를 저장합니다.
+4. 트랜잭션 커밋 후 `DocumentAnalysisService.analyzeUrl()`이 비동기로 실행됩니다.
+5. `DocumentAnalysisService`가 Python AI Engine의 `/analyze/url`을 호출합니다.
+6. AI Engine은 URL 본문을 수집하고 엔티티를 추출한 뒤 Neo4j에 `Document`, 엔티티 노드, `MENTIONED_IN_WORKSPACE`, `RELATED_TO` 관계를 저장합니다.
+7. 백엔드는 분석 결과에 따라 문서 상태를 `DONE` 또는 `ERROR`로 갱신합니다.
 
-**Spring Boot — Neo4j 연결 실패**
-```
-Neo4j가 실행 중인지 확인: http://localhost:7474
-비밀번호가 ohara1234인지 확인
-```
+### 노드 삭제
 
-**Spring Boot — 포트 충돌**
-```bash
-# 8080 포트 점유 프로세스 확인
-lsof -i :8080
-```
+1. 프론트엔드 노드 상세 패널에서 삭제 버튼을 누릅니다.
+2. `/api/node/{name}` DELETE 요청이 발생합니다.
+3. `GraphService.deleteNode()`가 Neo4j에서 해당 엔티티 노드를 `DETACH DELETE`합니다.
+4. 프론트엔드는 삭제된 노드와 연결 엣지를 현재 화면에서 제거합니다.
 
-**프론트엔드 — 그래프가 안 나옴**
-```
-콘솔(F12)에서 API 에러 확인
-Python 엔진이 최소 한 번 실행 완료됐는지 확인
-```
+## 데이터 흐름
 
----
+### MySQL
 
-## 개발 환경 설정
+- `users`: 사용자 계정과 BCrypt 해시 비밀번호
+- `user_tokens`: 로그인 토큰과 사용자 연결 정보
+- `workspaces`: 사용자별 워크스페이스
+- `documents`: 워크스페이스에 추가된 URL/PDF/노트 문서와 분석 상태
 
-**IntelliJ IDEA (백엔드)**
-1. `backend/` 폴더를 Maven 프로젝트로 열기
-2. Java 21 SDK 설정
-3. `OharaApplication.java` 실행
+### Neo4j
 
-**VSCode (Python + 프론트엔드)**
-```bash
-# 추천 익스텐션
-code --install-extension ms-python.python
-code --install-extension esbenp.prettier-vscode
-```
+- `Country`, `Organization`, `Person`: 추출된 엔티티 노드
+- `Article`: 수집 파이프라인의 기사 노드
+- `Document`: 워크스페이스에 사용자가 추가한 문서 노드
+- `RELATED_TO`: 엔티티 간 공동 등장 관계
+- `MENTIONED_IN`: 엔티티가 일반 기사에 언급됨
+- `MENTIONED_IN_WORKSPACE`: 엔티티가 특정 워크스페이스 문서에 언급됨
+
+## Java 파일 역할
+
+### 진입점과 설정
+
+- `OharaApplication.java`: Spring Boot 애플리케이션 진입점이며 `@EnableAsync`로 비동기 분석을 활성화합니다.
+- `SecurityConfig.java`: BCrypt 인코더와 Spring Security 필터 체인을 설정합니다. 현재 API는 자체 세션/토큰 인증을 사용하므로 기본 폼 로그인과 HTTP Basic은 끕니다.
+
+### Controller
+
+- `AuthController.java`: 회원가입, 로그인, 로그아웃, 현재 로그인 사용자 조회 API를 제공합니다. 성공 시 서버 세션에 로그인 상태를 저장합니다.
+- `GraphController.java`: 전체 그래프, 워크스페이스 그래프, 노드 상세, 검색, 노드 삭제 API를 제공합니다.
+- `WorkspaceController.java`: 워크스페이스 목록/생성/수정/삭제, 문서 목록/추가/삭제 API를 제공합니다. `Default` 워크스페이스는 API에서 항상 합성해 반환합니다.
+
+### Service
+
+- `AuthService.java`: 사용자 검증, 비밀번호 해시 검증, 토큰 생성/검증/삭제를 담당합니다.
+- `GraphService.java`: Neo4j 쿼리를 수행해 그래프 응답 DTO를 만듭니다.
+- `WorkspaceService.java`: 사용자 소유권을 확인하고 MySQL 워크스페이스/문서 데이터를 변경합니다.
+- `DocumentAnalysisService.java`: URL 문서 분석을 비동기로 AI Engine에 요청하고 문서 상태를 갱신합니다.
+
+### Entity
+
+- `User.java`: 사용자 계정 엔티티입니다.
+- `UserToken.java`: 로그인 토큰 엔티티입니다. `AuthService`가 생성한 토큰을 MySQL에 저장해 서버 재시작 후에도 검증할 수 있게 합니다.
+- `Workspace.java`: 사용자별 워크스페이스 엔티티입니다.
+- `Document.java`: 워크스페이스 문서와 분석 상태 엔티티입니다.
+
+### Repository
+
+- `UserRepository.java`: 사용자 조회와 중복 검사를 담당합니다.
+- `UserTokenRepository.java`: 토큰 저장/조회/삭제를 담당합니다.
+- `WorkspaceRepository.java`: 사용자별 워크스페이스 조회와 소유권 확인을 담당합니다.
+- `DocumentRepository.java`: 워크스페이스별 문서 목록 조회를 담당합니다.
+
+### DTO
+
+- `AuthDto.java`: 인증 요청/응답 record 모음입니다.
+- `GraphDto.java`: 그래프 노드, 엣지, 노드 상세, 기사 응답 record 모음입니다.
+
+## UserToken 관련 주의
+
+`AuthService`는 `UserToken`과 `UserTokenRepository`에 의존합니다. 따라서 아래 두 파일이 반드시 존재해야 합니다.
+
+- `backend/src/main/java/com/ohara/entity/UserToken.java`
+- `backend/src/main/java/com/ohara/repository/UserTokenRepository.java`
+
+현재 코드에는 두 파일이 포함되어 있으며 `./gradlew test`로 컴파일 검증됩니다. 만약 실행 중 `UserToken` 관련 오류가 계속 난다면 백엔드 프로세스가 오래된 빌드로 떠 있을 가능성이 높으므로 백엔드를 완전히 종료한 뒤 다시 실행하세요.
