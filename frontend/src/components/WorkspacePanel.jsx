@@ -52,7 +52,11 @@ function DocRow({ doc, onDelete }) {
 
 // ── URL 입력 폼 ──────────────────────────────────────────────────────
 function AddUrlForm({ workspaceId, onAdded }) {
+    const [mode,    setMode]    = useState('url')
     const [url,     setUrl]     = useState('')
+    const [title,   setTitle]   = useState('')
+    const [text,    setText]    = useState('')
+    const [file,    setFile]    = useState(null)
     const [loading, setLoading] = useState(false)
     const [error,   setError]   = useState('')
     const inputRef = useRef()
@@ -61,18 +65,26 @@ function AddUrlForm({ workspaceId, onAdded }) {
 
     async function handleSubmit(e) {
         e.preventDefault()
-        if (!url.trim()) return
-        // URL 간단 검증
-        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        if (mode === 'url' && !url.trim()) return
+        if (mode === 'text' && !text.trim()) return
+        if (mode === 'file' && !file) return
+        if (mode === 'url' && !url.startsWith('http://') && !url.startsWith('https://')) {
             setError('http:// 또는 https://로 시작하는 URL을 입력하세요.')
             return
         }
         setError('')
         setLoading(true)
         try {
-            const doc = await workspaceApi.addUrl(workspaceId, url.trim())
+            const doc = mode === 'url'
+                ? await workspaceApi.addUrl(workspaceId, url.trim())
+                : mode === 'text'
+                    ? await workspaceApi.addText(workspaceId, title.trim() || 'Untitled note', text.trim())
+                    : await workspaceApi.addFile(workspaceId, file)
             onAdded(doc)
             setUrl('')
+            setTitle('')
+            setText('')
+            setFile(null)
         } catch (err) {
             setError(err.message)
         } finally {
@@ -82,22 +94,76 @@ function AddUrlForm({ workspaceId, onAdded }) {
 
     return (
         <form onSubmit={handleSubmit} className="px-4 pb-3">
-            <div className="flex gap-2 items-center bg-white/5 border border-white/15 rounded-xl px-3 py-2">
-                <Icon.Link/>
-                <input
-                    ref={inputRef}
-                    value={url}
-                    onChange={e => setUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="flex-1 bg-transparent text-white/80 text-xs outline-none placeholder-white/25"
-                    disabled={loading}
-                />
+            <div className="flex gap-1 mb-2">
+                {[
+                    ['url', 'URL'],
+                    ['text', '텍스트'],
+                    ['file', '파일'],
+                ].map(([key, label]) => (
+                    <button
+                        key={key}
+                        type="button"
+                        onClick={() => { setMode(key); setError('') }}
+                        className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
+                            mode === key
+                                ? 'bg-blue-500/20 border-blue-400/30 text-blue-200'
+                                : 'bg-white/5 border-white/10 text-white/35 hover:text-white/60'
+                        }`}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+            <div className="space-y-2">
+                {mode === 'url' && (
+                    <div className="flex gap-2 items-center bg-white/5 border border-white/15 rounded-xl px-3 py-2">
+                        <Icon.Link/>
+                        <input
+                            ref={inputRef}
+                            value={url}
+                            onChange={e => setUrl(e.target.value)}
+                            placeholder="https://..."
+                            className="flex-1 bg-transparent text-white/80 text-xs outline-none placeholder-white/25"
+                            disabled={loading}
+                        />
+                    </div>
+                )}
+                {mode === 'text' && (
+                    <>
+                        <input
+                            value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            placeholder="문서 제목"
+                            className="w-full bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-white/80 text-xs outline-none placeholder-white/25"
+                            disabled={loading}
+                        />
+                        <textarea
+                            value={text}
+                            onChange={e => setText(e.target.value)}
+                            placeholder="분석할 본문을 붙여넣으세요"
+                            className="w-full h-28 resize-none bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-white/80 text-xs outline-none placeholder-white/25"
+                            disabled={loading}
+                        />
+                    </>
+                )}
+                {mode === 'file' && (
+                    <input
+                        type="file"
+                        accept=".pdf,.txt,.md,text/plain,application/pdf"
+                        onChange={e => setFile(e.target.files?.[0] ?? null)}
+                        className="w-full bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-white/60 text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-2 file:py-1 file:text-white/70"
+                        disabled={loading}
+                    />
+                )}
+            </div>
+            <div className="flex justify-end mt-2">
                 <button
                     type="submit"
-                    disabled={loading || !url.trim()}
-                    className="text-blue-400 hover:text-blue-300 disabled:text-white/20 transition-colors"
+                    disabled={loading || (mode === 'url' && !url.trim()) || (mode === 'text' && !text.trim()) || (mode === 'file' && !file)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-400/25 text-blue-300 hover:bg-blue-500/25 disabled:bg-white/5 disabled:border-white/10 disabled:text-white/20 transition-colors text-xs"
                 >
                     {loading ? <Icon.Spinner/> : <Icon.Plus/>}
+                    추가
                 </button>
             </div>
             {error && <p className="text-red-400 text-xs mt-1.5 px-1">{error}</p>}
@@ -181,7 +247,7 @@ function WorkspaceDetail({ workspace, onBack, onClose, onSelectWorkspace }) {
                             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-white/20 text-white/45 text-xs hover:text-white/70 hover:border-white/35 hover:bg-white/5 transition-all"
                         >
                             <Icon.Link/>
-                            URL 추가
+                            문서 추가
                         </button>
                     )}
                 </div>

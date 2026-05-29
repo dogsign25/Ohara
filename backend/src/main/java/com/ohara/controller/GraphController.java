@@ -31,9 +31,10 @@ public class GraphController {
     @GetMapping("/graph")
     public GraphResponse getGraph(
         @RequestParam(defaultValue = "100") @Min(10) @Max(500) int limit,
-        @RequestParam(defaultValue = "1")   @Min(1)            int minStrength
+        @RequestParam(defaultValue = "1")   @Min(1)            int minStrength,
+        @RequestParam(required = false) @Min(1) @Max(3650) Integer days
     ) {
-        return graphService.getGraph(limit, minStrength);
+        return graphService.getGraph(limit, minStrength, days);
     }
 
     /**
@@ -79,9 +80,45 @@ public class GraphController {
     public GraphResponse getWorkspaceGraph(
             @PathVariable Long workspaceId,
             @RequestParam(defaultValue = "100") @Min(10) @Max(500) int limit,
-            @RequestParam(defaultValue = "1")   @Min(1)            int minStrength
+            @RequestParam(defaultValue = "1")   @Min(1)            int minStrength,
+            @RequestParam(required = false) @Min(1) @Max(3650) Integer days
     ) {
-        return graphService.getWorkspaceGraph(workspaceId, limit, minStrength);
+        return graphService.getWorkspaceGraph(workspaceId, limit, minStrength, days);
+    }
+
+    @GetMapping("/path")
+    public ResponseEntity<PathResponse> findPath(
+            @RequestParam String from,
+            @RequestParam String to,
+            @RequestParam(defaultValue = "5") @Min(1) @Max(8) int maxDepth,
+            @RequestParam(required = false) Long workspaceId
+    ) {
+        return graphService.findPath(from, to, maxDepth, workspaceId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/edge/sources")
+    public List<EdgeSourceDto> getEdgeSources(
+            @RequestParam String source,
+            @RequestParam String target,
+            @RequestParam(required = false) Long workspaceId
+    ) {
+        return graphService.getEdgeSources(source, target, workspaceId);
+    }
+
+    @PatchMapping("/node/{name}")
+    public ResponseEntity<?> updateNode(
+            @PathVariable String name,
+            @RequestBody EntityUpdateRequest request
+    ) {
+        try {
+            return graphService.updateNode(name, request)
+                    .<ResponseEntity<?>>map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     /**

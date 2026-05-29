@@ -17,6 +17,12 @@ const NODE_COLOR = {
 
 const getNodeRadius = (degree) => Math.sqrt(degree + 1) * 1.5 + 2.5
 
+const edgeKey = (link) => {
+  const sourceId = typeof link.source === 'object' ? link.source.id : link.source
+  const targetId = typeof link.target === 'object' ? link.target.id : link.target
+  return [sourceId, targetId].sort().join('::')
+}
+
 export default function App({ user, onLogout }) {
   const fgRef = useRef()
 
@@ -28,9 +34,21 @@ export default function App({ user, onLogout }) {
   const [limit,        setLimit]        = useState(100)
   const [minStrength,  setMinStrength]  = useState(1)
   const [edgeFilter,   setEdgeFilter]   = useState('all')
+  const [days,         setDays]         = useState('')
   const [showFilter,     setShowFilter]     = useState(false)
   const [showWorkspace,  setShowWorkspace]  = useState(false)
+  const [showTools,      setShowTools]      = useState(false)
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(0)
+  const [selectedEdge, setSelectedEdge] = useState(null)
+  const [edgeSources,  setEdgeSources]  = useState([])
+  const [pathNodes,    setPathNodes]    = useState(new Set())
+  const [pathEdges,    setPathEdges]    = useState(new Set())
+  const [pathFrom,     setPathFrom]     = useState('')
+  const [pathTo,       setPathTo]       = useState('')
+  const [snapshots,    setSnapshots]    = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ohara:snapshots') || '[]') }
+    catch { return [] }
+  })
 
   // ── 그래프 로드 ────────────────────────────────────────────────
   // 워크스페이스 선택 시 해당 워크스페이스 노드만 쿼리
@@ -40,20 +58,26 @@ const loadGraph = useCallback(async () => {
         let data
         if (selectedWorkspaceId !== null) {
             // 워크스페이스 전용 그래프 (GraphController에 추가 필요)
-            data = await api.getWorkspaceGraph(selectedWorkspaceId, limit, minStrength)
+            data = await api.getWorkspaceGraph(selectedWorkspaceId, limit, minStrength, days || undefined)
         } else {
             // 기존 전역 그래프
-            data = await api.getGraph(limit, minStrength)
+            data = await api.getGraph(limit, minStrength, days || undefined)
         }
         const nodes = data.nodes.map(n => ({ id: n.name, name: n.name, type: n.type, degree: n.degree }))
-        const links = data.edges.map(e => ({ source: e.source, target: e.target, strength: e.strength }))
+        const links = data.edges.map(e => ({
+          source: e.source,
+          target: e.target,
+          strength: e.strength,
+          articleCount: e.articleCount,
+          lastMentioned: e.lastMentioned,
+        }))
         setGraphData({ nodes, links })
     } catch (err) {
         console.error('그래프 로드 실패:', err)
     } finally {
         setLoading(false)
     }
-}, [limit, minStrength, selectedWorkspaceId])  // selectedWorkspaceId 의존성 추가
+}, [limit, minStrength, selectedWorkspaceId, days])  // selectedWorkspaceId 의존성 추가
  
 useEffect(() => { loadGraph() }, [loadGraph])
 
@@ -98,11 +122,75 @@ useEffect(() => { loadGraph() }, [loadGraph])
     setHighlight(null)
   }
 
+  async function handleLinkClick(link) {
+    const sourceId = typeof link.source === 'object' ? link.source.id : link.source
+    const targetId = typeof link.target === 'object' ? link.target.id : link.target
+    setSelectedEdge({ source: sourceId, target: targetId, strength: link.strength })
+    setSelectedNode(null)
+    setHighlight(null)
+    setEdgeSources([])
+    try {
+      const sources = await api.getEdgeSources(sourceId, targetId, selectedWorkspaceId || undefined)
+      setEdgeSources(sources)
+    } catch {
+      setEdgeSources([])
+    }
+  }
+
+  async function handleFindPath(e) {
+    e.preventDefault()
+    if (!pathFrom.trim() || !pathTo.trim()) return
+    try {
+      const result = await api.findPath(pathFrom.trim(), pathTo.trim(), 5, selectedWorkspaceId || undefined)
+      setPathNodes(new Set(result.nodes.map(n => n.name)))
+      setPathEdges(new Set(result.edges.map(edgeKey)))
+      const first = graphData.nodes.find(n => n.id === pathFrom.trim())
+      if (first?.x != null) {
+        fgRef.current?.centerAt(first.x, first.y, 800)
+        fgRef.current?.zoom(2.2, 800)
+      }
+    } catch {
+      setPathNodes(new Set())
+      setPathEdges(new Set())
+      alert('연결 경로를 찾지 못했습니다.')
+    }
+  }
+
+  function saveSnapshot() {
+    const title = prompt('스냅샷 이름을 입력하세요', `Snapshot ${snapshots.length + 1}`)
+    if (!title) return
+    const shot = {
+      id: Date.now(),
+      title,
+      createdAt: new Date().toISOString(),
+      limit,
+      minStrength,
+      edgeFilter,
+      days,
+      selectedWorkspaceId,
+      selectedNode,
+      highlight,
+    }
+    const next = [shot, ...snapshots].slice(0, 12)
+    setSnapshots(next)
+    localStorage.setItem('ohara:snapshots', JSON.stringify(next))
+  }
+
+  function restoreSnapshot(shot) {
+    setLimit(shot.limit)
+    setMinStrength(shot.minStrength)
+    setEdgeFilter(shot.edgeFilter)
+    setDays(shot.days || '')
+    setSelectedWorkspaceId(shot.selectedWorkspaceId)
+    setSelectedNode(shot.selectedNode)
+    setHighlight(shot.highlight)
+  }
+
   // ── 노드 그리기 ────────────────────────────────────────────────
   const paintNode = useCallback((node, ctx, scale) => {
     const r      = getNodeRadius(node.degree ?? 0)
     const color  = NODE_COLOR[node.type] ?? '#9ca3af'
-    const isHigh = node.id === highlight
+    const isHigh = node.id === highlight || pathNodes.has(node.id)
 
     if (isHigh) {
       ctx.beginPath()
@@ -128,7 +216,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
       ctx.textBaseline = 'middle'
       ctx.fillText(label, node.x, node.y + r + 9 / scale)
     }
-  }, [highlight])
+  }, [highlight, pathNodes])
 
   const nodePointer = useCallback((node, color, ctx) => {
     const r = getNodeRadius(node.degree ?? 0)
@@ -146,12 +234,14 @@ useEffect(() => { loadGraph() }, [loadGraph])
       if (highlight && (sourceId === highlight || targetId === highlight)) {
         return baseWidth + 2.0
       }
+      if (pathEdges.has(edgeKey(link))) return baseWidth + 2.5
       return baseWidth
     },
-    [highlight]
+    [highlight, pathEdges]
   )
 
   const getLinkColor = useCallback(link => {
+    if (pathEdges.has(edgeKey(link))) return 'rgba(52,211,153,0.9)'
     if (!highlight) return 'rgba(255,255,255,0.08)'
 
     const sourceObj = typeof link.source === 'object' ? link.source : null
@@ -170,7 +260,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
     }
 
     return 'rgba(255,255,255,0.02)'
-  }, [highlight])
+  }, [highlight, pathEdges])
 
   // ── 렌더 ───────────────────────────────────────────────────────
   return (
@@ -214,6 +304,19 @@ useEffect(() => { loadGraph() }, [loadGraph])
             onLimit={setLimit} onMinStrength={setMinStrength}
           />
         </div>
+
+        <select
+          value={days}
+          onChange={e => setDays(e.target.value)}
+          className="pointer-events-auto bg-white/5 border border-white/10 text-white/60 text-xs rounded-xl px-2 py-2 outline-none hover:bg-white/10"
+          title="시간 필터"
+        >
+          <option value="">전체 기간</option>
+          <option value="1">최근 1일</option>
+          <option value="7">최근 7일</option>
+          <option value="30">최근 30일</option>
+          <option value="90">최근 90일</option>
+        </select>
 
         {/* 워크스페이스 토글 */}
         <button
@@ -259,6 +362,20 @@ useEffect(() => { loadGraph() }, [loadGraph])
           필터
         </button>
 
+        <button
+          onClick={() => setShowTools(v => !v)}
+          className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs transition-all pointer-events-auto ${
+            showTools
+              ? 'bg-white/15 border-white/25 text-white'
+              : 'bg-white/5 border-white/10 text-white/50 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 4.5L21 12l-7.5 7.5M21 12H3"/>
+          </svg>
+          탐색
+        </button>
+
         {/* 통계 */}
         <span className="text-white/25 text-xs shrink-0 hidden lg:block">
           {filtered.nodes.length}노드 · {filtered.links.length}관계
@@ -285,6 +402,74 @@ useEffect(() => { loadGraph() }, [loadGraph])
       {showFilter && (
         <div className="absolute top-16 left-4 z-30">
           <FilterPanel active={edgeFilter} onChange={setEdgeFilter} />
+        </div>
+      )}
+
+      {showTools && (
+        <div className="absolute top-16 left-4 z-30 w-80 rounded-2xl bg-gray-900/95 backdrop-blur border border-white/10 shadow-2xl overflow-hidden">
+          <form onSubmit={handleFindPath} className="p-4 border-b border-white/10">
+            <p className="text-white/50 text-xs mb-2">경로 찾기</p>
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+              <input
+                value={pathFrom}
+                onChange={e => setPathFrom(e.target.value)}
+                placeholder="출발 노드"
+                className="min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white/80 text-xs outline-none placeholder-white/25"
+              />
+              <span className="text-white/20 text-xs">→</span>
+              <input
+                value={pathTo}
+                onChange={e => setPathTo(e.target.value)}
+                placeholder="도착 노드"
+                className="min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white/80 text-xs outline-none placeholder-white/25"
+              />
+            </div>
+            <div className="flex justify-between mt-2">
+              <button
+                type="button"
+                onClick={() => { setPathNodes(new Set()); setPathEdges(new Set()) }}
+                className="text-white/35 hover:text-white/60 text-xs"
+              >
+                초기화
+              </button>
+              <button
+                type="submit"
+                className="px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-400/25 text-emerald-300 text-xs hover:bg-emerald-500/25"
+              >
+                찾기
+              </button>
+            </div>
+          </form>
+
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-white/50 text-xs">스냅샷</p>
+              <button
+                onClick={saveSnapshot}
+                className="px-2.5 py-1 rounded-lg bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs hover:bg-blue-500/25"
+              >
+                저장
+              </button>
+            </div>
+            {snapshots.length === 0 ? (
+              <p className="text-white/25 text-xs">저장된 스냅샷 없음</p>
+            ) : (
+              <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                {snapshots.map(shot => (
+                  <button
+                    key={shot.id}
+                    onClick={() => restoreSnapshot(shot)}
+                    className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5"
+                  >
+                    <p className="text-white/70 text-xs truncate">{shot.title}</p>
+                    <p className="text-white/25 text-xs mt-0.5">
+                      {new Date(shot.createdAt).toLocaleDateString('ko-KR')}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -320,11 +505,14 @@ useEffect(() => { loadGraph() }, [loadGraph])
         onNodeClick={node => {
           setSelectedNode(node.id)
           setHighlight(node.id)
+          setSelectedEdge(null)
         }}
         onBackgroundClick={() => {
           setSelectedNode(null)
           setHighlight(null)
+          setSelectedEdge(null)
         }}
+        onLinkClick={handleLinkClick}
         onNodeDrag={node => {
           setHighlight(node.id)
         }}
@@ -335,11 +523,54 @@ useEffect(() => { loadGraph() }, [loadGraph])
         cooldownTicks={100}
       />
 
+      {selectedEdge && (
+        <div className="absolute right-4 top-20 w-80 bg-gray-900/90 backdrop-blur border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-40">
+          <div className="flex items-start justify-between p-4 border-b border-white/10">
+            <div className="min-w-0">
+              <p className="text-white/40 text-xs">관계 출처</p>
+              <h2 className="text-white text-sm font-medium truncate mt-1">
+                {selectedEdge.source} ↔ {selectedEdge.target}
+              </h2>
+              <p className="text-white/35 text-xs mt-1">강도 {selectedEdge.strength}</p>
+            </div>
+            <button
+              onClick={() => setSelectedEdge(null)}
+              className="text-white/40 hover:text-white transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            {edgeSources.length ? (
+              edgeSources.map((item, i) => (
+                <a
+                  key={i}
+                  href={item.url && !item.url.startsWith('workspace://') ? item.url : undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block px-4 py-3 border-b border-white/5 hover:bg-white/5"
+                >
+                  <p className="text-white/85 text-sm leading-snug line-clamp-2">{item.title || item.url}</p>
+                  <p className="text-white/35 text-xs mt-1">
+                    {item.kind} · {item.source}
+                  </p>
+                </a>
+              ))
+            ) : (
+              <p className="text-white/30 text-sm text-center py-8">출처를 불러오는 중...</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 기사 패널 */}
       <ArticlePanel
         selectedNode={selectedNode}
         onClose={() => { setSelectedNode(null); setHighlight(null) }}
         onDelete={handleNodeDeleted}
+        onUpdated={loadGraph}
       />
     </div>
   )

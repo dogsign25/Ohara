@@ -1,6 +1,7 @@
 import spacy
 import logging
 from dataclasses import dataclass
+from itertools import combinations
 from .normalizer import get_canonical_name, get_entity_type
 
 logger = logging.getLogger(__name__)
@@ -19,20 +20,20 @@ class Entity:
 class Result:
     article: object
     entities: list
+    relations: list
 
 
 def extract_batch(articles):
     results = []
     texts = [a.text for a in articles]
     for article, doc in zip(articles, _nlp.pipe(texts, batch_size=32)):
-        entities = _extract(doc)
-        results.append(Result(article=article, entities=entities))
+        entities, relations = _extract(doc)
+        results.append(Result(article=article, entities=entities, relations=relations))
     return results
 
 
 def _extract(doc):
-    raw_persons = []
-    raw_others  = []
+    mentions = []
 
     for ent in doc.ents:
         if ent.label_ not in TARGET:
@@ -50,30 +51,52 @@ def _extract(doc):
             logger.warning(f"잘못된 타입: name={name!r}, etype={etype!r}")
             continue
 
-        if etype == "Person":
-            raw_persons.append(name)
-        else:
-            raw_others.append(Entity(name=name, etype=etype))
+        mentions.append({
+            "name": name,
+            "etype": etype,
+            "sent_start": ent.sent.start,
+        })
 
-    unified = _unify_names(raw_persons)
+    person_map = _build_person_map(
+        m["name"] for m in mentions
+        if m["etype"] == "Person"
+    )
 
     seen = set()
-    result = []
-    for e in raw_others:
+    entities = []
+    sentence_entities = {}
+
+    for mention in mentions:
+        name = person_map.get(mention["name"], mention["name"])
+        e = Entity(name=name, etype=mention["etype"])
         key = f"{e.etype}:{e.name}"
+
         if key not in seen:
             seen.add(key)
-            result.append(e)
-    for n in unified:
-        key = f"Person:{n}"
-        if key not in seen:
+            entities.append(e)
+
+        sentence_entities.setdefault(mention["sent_start"], {})[key] = e
+
+    relations = _build_sentence_relations(sentence_entities)
+    return entities, relations
+
+
+def _build_sentence_relations(sentence_entities):
+    seen = set()
+    relations = []
+
+    for entity_map in sentence_entities.values():
+        for x, y in combinations(entity_map.values(), 2):
+            key = tuple(sorted((f"{x.etype}:{x.name}", f"{y.etype}:{y.name}")))
+            if key in seen or key[0] == key[1]:
+                continue
             seen.add(key)
-            result.append(Entity(name=n, etype="Person"))
+            relations.append((x, y))
 
-    return result
+    return relations
 
 
-def _unify_names(names):
+def _build_person_map(names):
     """성(last name) 기준으로 풀네임 통합"""
     full_names   = {}
     single_names = []
@@ -89,8 +112,8 @@ def _unify_names(names):
         else:
             single_names.append(n)
 
-    unified = set(full_names.values())
+    name_map = {n: n for n in full_names.values()}
     for s in single_names:
-        unified.add(full_names.get(s.lower(), s))
+        name_map[s] = full_names.get(s.lower(), s)
 
-    return list(unified)
+    return name_map

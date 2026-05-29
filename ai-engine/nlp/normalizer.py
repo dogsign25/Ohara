@@ -43,6 +43,12 @@ COUNTRY_ALIASES = {
     "taiwan": "Taiwan", "republic of china": "Taiwan",
     "saudi": "Saudi Arabia",
     "eu": "European Union", "the eu": "European Union",
+    # Frequent capital/metonym mentions in international news.
+    "washington": "United States", "washington dc": "United States",
+    "washington, dc": "United States", "beijing": "China",
+    "moscow": "Russia", "kyiv": "Ukraine", "kiev": "Ukraine",
+    "tehran": "Iran", "seoul": "South Korea", "pyongyang": "North Korea",
+    "brussels": "European Union",
 }
 
 ORG_ALIASES = {
@@ -57,8 +63,28 @@ ORG_ALIASES = {
     "state department": "U.S. State Department",
     "us state department": "U.S. State Department",
     "pentagon": "U.S. Department of Defense",
-    "white house": "White House", "kremlin": "Kremlin",
+    "white house": "White House", "the white house": "White House",
+    "kremlin": "Kremlin", "the kremlin": "Kremlin",
     "iaea": "IAEA", "icc": "ICC", "world bank": "World Bank",
+}
+
+GENERIC_ORGS = {
+    "administration", "agency", "allies", "authority", "cabinet",
+    "commission", "committee", "congress", "council", "court",
+    "delegation", "department", "embassy", "government", "ministry",
+    "officials", "opposition", "parliament", "party", "senate",
+    "the administration", "the agency", "the cabinet", "the commission",
+    "the committee", "the congress", "the council", "the court",
+    "the delegation", "the department", "the embassy", "the government",
+    "the ministry", "the opposition", "the parliament", "the party",
+    "the senate",
+}
+
+GENERIC_PERSONS = {
+    "aide", "ally", "analyst", "candidate", "chair", "chief", "commander",
+    "diplomat", "general", "governor", "leader", "minister", "official",
+    "president", "prime minister", "secretary", "senator", "spokesman",
+    "spokesperson", "spokeswoman",
 }
 
 _TITLE_PREFIX = re.compile(
@@ -69,11 +95,15 @@ _TITLE_PREFIX = re.compile(
 
 _NOISE = re.compile(
     r"^\d+$|^[^a-zA-Z]+$|^.{1,2}$"
+    r"|^[a-zA-Z]\.$"
     r"|^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$"
     r"|^(january|february|march|april|may|june|july|august"
     r"|september|october|november|december)$",
     re.IGNORECASE,
 )
+
+_EDGE_PUNCT = re.compile(r"^[\s\"'“”‘’()[\]{}.,;:!?-]+|[\s\"'“”‘’()[\]{}.,;:!?-]+$")
+_HAS_ALPHA = re.compile(r"[A-Za-z]")
 
 
 def get_canonical_name(raw_text: str, spacy_label: str):
@@ -81,16 +111,16 @@ def get_canonical_name(raw_text: str, spacy_label: str):
     엔티티 이름 정규화. 실패 시 None 반환.
     반환값: str | None  (튜플 아님)
     """
-    text = html.unescape(raw_text).strip()
+    text = _clean_entity_text(raw_text)
     if not text or _NOISE.match(text):
         return None
 
     key = text.lower()
+    stripped_key = _TITLE_PREFIX.sub("", text).strip().lower()
 
     # 알려진 인물 사전 (오분류 교정)
     if key in KNOWN_PERSONS:
         return KNOWN_PERSONS[key]
-    stripped_key = _TITLE_PREFIX.sub("", text).strip().lower()
     if stripped_key in KNOWN_PERSONS:
         return KNOWN_PERSONS[stripped_key]
 
@@ -98,11 +128,13 @@ def get_canonical_name(raw_text: str, spacy_label: str):
         return COUNTRY_ALIASES.get(key, _title(text))
 
     if spacy_label == "ORG":
+        if key in GENERIC_ORGS:
+            return None
         return ORG_ALIASES.get(key, text)
 
     if spacy_label == "PERSON":
         clean = _TITLE_PREFIX.sub("", text).strip()
-        if len(clean) < 3 or not any(c.isupper() for c in clean):
+        if _is_bad_person_name(clean):
             return None
         return _title(clean)
 
@@ -114,7 +146,7 @@ def get_entity_type(raw_text: str, spacy_label: str):
     엔티티 타입 반환. 오분류 교정 포함.
     반환값: 'Country' | 'Organization' | 'Person' | None
     """
-    text = html.unescape(raw_text).strip()
+    text = _clean_entity_text(raw_text)
     key  = text.lower()
     stripped_key = _TITLE_PREFIX.sub("", text).strip().lower()
 
@@ -122,7 +154,29 @@ def get_entity_type(raw_text: str, spacy_label: str):
     if key in KNOWN_PERSONS or stripped_key in KNOWN_PERSONS:
         return "Person"
 
+    if spacy_label == "ORG" and key in GENERIC_ORGS:
+        return None
+    if spacy_label == "PERSON" and _is_bad_person_name(text):
+        return None
+
     return {"GPE": "Country", "ORG": "Organization", "PERSON": "Person"}.get(spacy_label)
+
+
+def _clean_entity_text(raw_text):
+    text = html.unescape(raw_text or "")
+    text = " ".join(text.split())
+    return _EDGE_PUNCT.sub("", text)
+
+
+def _is_bad_person_name(text):
+    key = text.lower().strip()
+    if len(text) < 3 or not _HAS_ALPHA.search(text):
+        return True
+    if key in GENERIC_PERSONS:
+        return True
+    if not any(c.isupper() for c in text):
+        return True
+    return False
 
 
 def _title(text):

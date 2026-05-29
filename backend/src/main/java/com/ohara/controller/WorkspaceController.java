@@ -4,7 +4,9 @@ import com.ohara.entity.Document;
 import com.ohara.entity.Workspace;
 import com.ohara.service.WorkspaceService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -137,6 +139,33 @@ public class WorkspaceController {
         try {
             Document doc = workspaceService.addUrl(
                     extractToken(auth), id, body.get("url"));
+            return ResponseEntity.ok(toDocDto(doc));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/documents/text")
+    public ResponseEntity<?> addTextDoc(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        try {
+            Document doc = workspaceService.addText(
+                    extractToken(auth), id, body.get("title"), body.get("text"));
+            return ResponseEntity.ok(toDocDto(doc));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping(value = "/{id}/documents/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> addFileDoc(
+            @RequestHeader(value = "Authorization", required = false) String auth,
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            Document doc = workspaceService.addFile(extractToken(auth), id, file);
             return ResponseEntity.ok(toDocDto(doc));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));

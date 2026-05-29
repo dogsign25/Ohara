@@ -6,11 +6,16 @@ import com.ohara.entity.Workspace;
 import com.ohara.repository.DocumentRepository;
 import com.ohara.repository.UserRepository;
 import com.ohara.repository.WorkspaceRepository;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -148,6 +153,58 @@ public class WorkspaceService {
         return documentRepo.save(saved);
     }
 
+    @Transactional(transactionManager = "transactionManager")
+    public Document addText(String token, Long workspaceId, String title, String text) {
+        User user = getUserByToken(token);
+        Workspace ws = workspaceRepo.findByIdAndUserId(workspaceId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("워크스페이스를 찾을 수 없습니다."));
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException("분석할 텍스트를 입력해주세요.");
+        }
+
+        String cleanTitle = title != null && !title.isBlank() ? title.trim() : "Untitled note";
+        Document doc = createPendingDocument(ws, Document.DocType.NOTE, cleanTitle, null, text.trim());
+        scheduleTextAnalysis(doc.getId(), workspaceId, cleanTitle, text.trim());
+        return documentRepo.save(doc);
+    }
+
+    @Transactional(transactionManager = "transactionManager")
+    public Document addFile(String token, Long workspaceId, MultipartFile file) {
+        User user = getUserByToken(token);
+        Workspace ws = workspaceRepo.findByIdAndUserId(workspaceId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("워크스페이스를 찾을 수 없습니다."));
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("파일을 선택해주세요.");
+        }
+
+        try {
+            String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "uploaded document";
+            String lower = filename.toLowerCase();
+            String text;
+            Document.DocType type;
+            if (lower.endsWith(".pdf")) {
+                type = Document.DocType.PDF;
+                try (PDDocument pdf = Loader.loadPDF(file.getBytes())) {
+                    text = new PDFTextStripper().getText(pdf);
+                }
+            } else {
+                type = Document.DocType.NOTE;
+                text = new String(file.getBytes(), StandardCharsets.UTF_8);
+            }
+            if (text == null || text.isBlank()) {
+                throw new IllegalArgumentException("파일에서 분석할 텍스트를 찾지 못했습니다.");
+            }
+
+            Document doc = createPendingDocument(ws, type, filename, null, text.trim());
+            scheduleTextAnalysis(doc.getId(), workspaceId, filename, text.trim());
+            return documentRepo.save(doc);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("파일을 읽지 못했습니다: " + e.getMessage());
+        }
+    }
+
     /**
      * 문서 소유권을 확인한 뒤 MySQL 문서와 Neo4j Document 노드를 함께 삭제합니다.
      */
@@ -161,5 +218,33 @@ public class WorkspaceService {
                 .orElseThrow(() -> new IllegalArgumentException("문서를 찾을 수 없습니다."));
         graphService.deleteWorkspaceDocument(workspaceId, docId);
         documentRepo.delete(doc);
+    }
+
+    private Document createPendingDocument(Workspace ws, Document.DocType type, String title, String sourceUrl, String content) {
+        Document doc = new Document();
+        doc.setWorkspace(ws);
+        doc.setType(type);
+        doc.setSourceUrl(sourceUrl);
+        doc.setTitle(title);
+        doc.setContent(content);
+        doc.setStatus(Document.Status.PENDING);
+        Document saved = documentRepo.save(doc);
+
+        ws.setUpdatedAt(LocalDateTime.now());
+        workspaceRepo.save(ws);
+        return saved;
+    }
+
+    private void scheduleTextAnalysis(Long docId, Long workspaceId, String title, String text) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    analysisService.analyzeText(docId, workspaceId, title, text);
+                }
+            });
+        } else {
+            analysisService.analyzeText(docId, workspaceId, title, text);
+        }
     }
 }

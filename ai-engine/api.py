@@ -52,6 +52,13 @@ class AnalyzeUrlRequest(BaseModel):
     doc_id: Optional[int] = None
 
 
+class AnalyzeTextRequest(BaseModel):
+    title: str
+    text: str
+    workspace_id: int
+    doc_id: Optional[int] = None
+
+
 class EntityResult(BaseModel):
     name: str
     type: str  # Country | Organization | Person
@@ -119,9 +126,10 @@ def analyze_url(req: AnalyzeUrlRequest):
     )
     results = extract_batch([article])
     entities = results[0].entities  # List[Entity]
+    relations = results[0].relations
 
     # 3) Neo4j에 저장 (워크스페이스 ID 태그 포함)
-    _save_to_neo4j(req.workspace_id, req.doc_id, req.url, fetched["title"], entities)
+    _save_to_neo4j(req.workspace_id, req.doc_id, req.url, fetched["title"], entities, relations)
 
     entity_list = [
         EntityResult(name=e.name, type=e.etype)
@@ -136,7 +144,43 @@ def analyze_url(req: AnalyzeUrlRequest):
     )
 
 
-def _save_to_neo4j(workspace_id: int, doc_id, url: str, title: str, entities):
+@app.post("/analyze/text", response_model=AnalyzeUrlResponse)
+def analyze_text(req: AnalyzeTextRequest):
+    """
+    사용자가 직접 입력하거나 업로드한 텍스트 → NER 분석 → Neo4j 저장
+    """
+    title = req.title.strip() if req.title and req.title.strip() else "Untitled document"
+    text = " ".join(req.text.split())[:12000]
+    if not text:
+        raise HTTPException(status_code=400, detail="분석할 텍스트가 없습니다.")
+
+    article = Article(
+        title=title,
+        url=f"workspace://{req.workspace_id}/{req.doc_id or title}",
+        source="workspace",
+        published_at=datetime.now(timezone.utc),
+        text=f"{title}. {text}",
+    )
+    results = extract_batch([article])
+    entities = results[0].entities
+    relations = results[0].relations
+
+    _save_to_neo4j(req.workspace_id, req.doc_id, article.url, title, entities, relations)
+
+    entity_list = [
+        EntityResult(name=e.name, type=e.etype)
+        for e in entities
+    ]
+
+    return AnalyzeUrlResponse(
+        title=title,
+        entity_count=len(entity_list),
+        entities=entity_list,
+        workspace_id=req.workspace_id,
+    )
+
+
+def _save_to_neo4j(workspace_id: int, doc_id, url: str, title: str, entities, relations):
     """
     워크스페이스 전용 그래프 저장.
     - (Document) 노드에 workspaceId 속성 부여
@@ -144,7 +188,7 @@ def _save_to_neo4j(workspace_id: int, doc_id, url: str, title: str, entities):
     - MENTIONED_IN_WORKSPACE 관계로 워크스페이스 필터링 지원
     """
     try:
-        writer.write_workspace_document(workspace_id, doc_id, url, title, entities)
+        writer.write_workspace_document(workspace_id, doc_id, url, title, entities, relations)
     except Exception as e:
         print(f"[Neo4j 저장 실패] {e}")
 

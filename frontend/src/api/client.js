@@ -16,10 +16,21 @@ async function del(path) {
   return data
 }
 
+async function patch(path, body) {
+  const res = await fetch(`/api${path}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.message || `API ${res.status}: ${path}`)
+  return data
+}
+
 export const api = {
   /** 전체 그래프 — limit, minStrength로 크기/품질 조절 */
-  getGraph(limit = 100, minStrength = 1) {
-    return get('/graph', { limit, minStrength })
+  getGraph(limit = 100, minStrength = 1, days) {
+    return get('/graph', { limit, minStrength, days })
   },
 
   /** 특정 노드 상세 (관련 노드 + 기사) */
@@ -33,11 +44,23 @@ export const api = {
   },
 
   // ★ 추가: 워크스페이스 전용 그래프
-  getWorkspaceGraph(workspaceId, limit = 100, minStrength = 1) {
-      return get(`/graph/workspace/${workspaceId}`, { limit, minStrength })
+  getWorkspaceGraph(workspaceId, limit = 100, minStrength = 1, days) {
+      return get(`/graph/workspace/${workspaceId}`, { limit, minStrength, days })
   },
 
   deleteNode(name) {
     return del(`/node/${encodeURIComponent(name)}`)
+  },
+
+  updateNode(name, body) {
+    return patch(`/node/${encodeURIComponent(name)}`, body)
+  },
+
+  findPath(from, to, maxDepth = 5, workspaceId) {
+    return get('/path', { from, to, maxDepth, workspaceId })
+  },
+
+  getEdgeSources(source, target, workspaceId) {
+    return get('/edge/sources', { source, target, workspaceId })
   },
 }

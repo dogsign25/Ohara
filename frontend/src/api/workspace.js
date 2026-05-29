@@ -10,6 +10,12 @@ function authHeaders() {
     }
 }
 
+function bearerHeaders() {
+    return {
+        'Authorization': `Bearer ${getToken()}`,
+    }
+}
+
 async function req(method, path, body) {
     const res = await fetch(path, {
         method,
@@ -48,6 +54,25 @@ export const workspaceApi = {
     // URL 추가 + 분석
     addUrl: (workspaceId, url) =>
         req('POST', `/api/workspaces/${workspaceId}/documents`, { url }),
+
+    addText: (workspaceId, title, text) =>
+        req('POST', `/api/workspaces/${workspaceId}/documents/text`, { title, text }),
+
+    addFile: async (workspaceId, file) => {
+        const form = new FormData()
+        form.append('file', file)
+        const res = await fetch(`/api/workspaces/${workspaceId}/documents/file`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: bearerHeaders(),
+            body: form,
+        })
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err.message || `API 오류 ${res.status}`)
+        }
+        return res.json()
+    },
 
     // 문서 삭제
     deleteDocument: (workspaceId, docId) =>

@@ -7,16 +7,23 @@ const BADGE = {
   Person:       'bg-purple-500/30 text-purple-200',
 }
 
-export default function ArticlePanel({ selectedNode, onClose, onDelete }) {
+export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdated }) {
   const [detail,  setDetail]  = useState(null)
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editType, setEditType] = useState('Country')
 
   useEffect(() => {
     if (!selectedNode) { setDetail(null); return }
     setLoading(true)
     api.getNode(selectedNode)
-      .then(setDetail)
+      .then(data => {
+        setDetail(data)
+        setEditName(data.name)
+        setEditType(data.type)
+      })
       .catch(() => setDetail(null))
       .finally(() => setLoading(false))
   }, [selectedNode])
@@ -37,6 +44,23 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete }) {
     }
   }
 
+  async function handleUpdate(e) {
+    e.preventDefault()
+    if (!editName.trim()) return
+    try {
+      const updated = await api.updateNode(selectedNode, {
+        name: editName.trim(),
+        type: editType,
+      })
+      setDetail(prev => prev ? { ...prev, name: updated.name, type: updated.type } : prev)
+      setEditing(false)
+      onUpdated?.()
+      onClose()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
   return (
     <div className="absolute right-4 top-20 bottom-4 w-80 bg-gray-900/90 backdrop-blur border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl z-40">
 
@@ -45,6 +69,30 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete }) {
         <div>
           {loading
             ? <div className="h-5 w-32 bg-white/10 rounded animate-pulse"/>
+            : editing
+              ? (
+                <form onSubmit={handleUpdate} className="space-y-2">
+                  <input
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    className="w-full bg-white/5 border border-white/15 rounded-lg px-2 py-1.5 text-white text-sm outline-none"
+                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={editType}
+                      onChange={e => setEditType(e.target.value)}
+                      className="flex-1 bg-gray-950 border border-white/15 rounded-lg px-2 py-1.5 text-white/80 text-xs outline-none"
+                    >
+                      <option>Country</option>
+                      <option>Organization</option>
+                      <option>Person</option>
+                    </select>
+                    <button className="px-2.5 py-1.5 rounded-lg bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs">
+                      저장
+                    </button>
+                  </div>
+                </form>
+              )
             : <>
                 <h2 className="text-white font-medium">{detail?.name ?? selectedNode}</h2>
                 {detail && (
@@ -59,6 +107,15 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete }) {
           }
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setEditing(v => !v)}
+            className="text-white/35 hover:text-blue-300 transition-colors"
+            title="엔티티 수정"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+          </button>
           <button
             onClick={handleDelete}
             disabled={deleting}

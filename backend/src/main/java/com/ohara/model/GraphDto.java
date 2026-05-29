@@ -29,6 +29,15 @@ public class GraphDto {
         String publishedAt
     ) {}
 
+    /** 관계선을 클릭했을 때 보여줄 출처 문서/기사 정보입니다. */
+    public record EdgeSourceDto(
+        String title,
+        String url,
+        String source,
+        String publishedAt,
+        String kind
+    ) {}
+
     /** 그래프 화면이 한 번에 소비하는 노드/엣지 묶음입니다. */
     public record GraphResponse(
         List<NodeDto> nodes,
@@ -44,5 +53,17 @@ public class GraphDto {
         int              degree,
         List<NodeDto>    relatedNodes,
         List<ArticleDto> recentArticles
+    ) {}
+
+    /** 두 엔티티 사이의 최단 경로 결과입니다. */
+    public record PathResponse(
+        List<NodeDto> nodes,
+        List<EdgeDto> edges
+    ) {}
+
+    /** 엔티티 이름/타입 수정 요청입니다. */
+    public record EntityUpdateRequest(
+        String name,
+        String type
     ) {}
 }

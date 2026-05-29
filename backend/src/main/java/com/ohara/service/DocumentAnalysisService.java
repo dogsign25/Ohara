@@ -63,4 +63,45 @@ public class DocumentAnalysisService {
             }
         }
     }
+
+    @Async
+    @Transactional(transactionManager = "transactionManager")
+    public void analyzeText(Long docId, Long workspaceId, String title, String text) {
+        Document doc = documentRepo.findById(docId).orElse(null);
+        if (doc == null) return;
+
+        doc.setStatus(Document.Status.ANALYZING);
+        documentRepo.save(doc);
+
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> result = restTemplate.postForObject(
+                        aiUrl + "/analyze/text",
+                        Map.of(
+                                "title", title,
+                                "text", text,
+                                "workspace_id", workspaceId,
+                                "doc_id", docId
+                        ),
+                        Map.class
+                );
+
+                if (result != null) {
+                    if (result.containsKey("title"))
+                        doc.setTitle((String) result.get("title"));
+                    if (result.containsKey("entity_count"))
+                        doc.setEntityCount((Integer) result.get("entity_count"));
+                }
+                doc.setStatus(Document.Status.DONE);
+                documentRepo.save(doc);
+                return;
+            } catch (Exception e) {
+                if (attempt == 3) {
+                    doc.setStatus(Document.Status.ERROR);
+                    documentRepo.save(doc);
+                }
+            }
+        }
+    }
 }
