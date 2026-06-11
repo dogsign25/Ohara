@@ -15,6 +15,25 @@ const NODE_COLOR = {
   Person:       '#c084fc',
 }
 
+const DEFAULT_SETTINGS = {
+  defaultLimit: 100,
+  defaultDays: '',
+  autoOpenWorkspace: false,
+  densePanels: false,
+}
+
+/** 브라우저에 저장된 그래프 화면 설정을 기본값과 합쳐 반환한다. */
+const readSettings = () => {
+  try {
+    return {
+      ...DEFAULT_SETTINGS,
+      ...JSON.parse(localStorage.getItem('ohara:settings') || '{}'),
+    }
+  } catch {
+    return DEFAULT_SETTINGS
+  }
+}
+
 /** 노드 연결 수를 화면 반지름으로 변환한다. */
 const getNodeRadius = (degree) => Math.sqrt(degree + 1) * 1.5 + 2.5
 
@@ -35,18 +54,23 @@ export default function GraphPage({
   onSelectWorkspace,
 }) {
   const fgRef = useRef()
+  const [settings] = useState(readSettings)
+  const densePanels = Boolean(settings.densePanels)
 
   const [graphData,    setGraphData]    = useState({ nodes: [], links: [] })
   const [filtered,     setFiltered]     = useState({ nodes: [], links: [] })
   const [loading,      setLoading]      = useState(true)
   const [selectedNode, setSelectedNode] = useState(null)
   const [highlight,    setHighlight]    = useState(null)
-  const [limit,        setLimit]        = useState(100)
+  const [limit,        setLimit]        = useState(() => {
+    const value = Number(settings.defaultLimit)
+    return Number.isFinite(value) ? Math.min(500, Math.max(20, value)) : 100
+  })
   const [minStrength,  setMinStrength]  = useState(1)
   const [edgeFilter,   setEdgeFilter]   = useState('all')
-  const [days,         setDays]         = useState('')
+  const [days,         setDays]         = useState(settings.defaultDays || '')
   const [showFilter,     setShowFilter]     = useState(false)
-  const [showWorkspace,  setShowWorkspace]  = useState(false)
+  const [showWorkspace,  setShowWorkspace]  = useState(Boolean(settings.autoOpenWorkspace))
   const [showTools,      setShowTools]      = useState(false)
   const [selectedEdge, setSelectedEdge] = useState(null)
   const [edgeSources,  setEdgeSources]  = useState([])
@@ -167,10 +191,17 @@ useEffect(() => { loadGraph() }, [loadGraph])
         fgRef.current?.zoom(2.2, 800)
       }
     } catch {
-      setPathNodes(new Set())
-      setPathEdges(new Set())
+      clearPath()
       alert('연결 경로를 찾지 못했습니다.')
     }
+  }
+
+  /** 경로 강조와 출발·도착 입력값을 모두 초기화한다. */
+  function clearPath() {
+    setPathNodes(new Set())
+    setPathEdges(new Set())
+    setPathFrom('')
+    setPathTo('')
   }
 
   /** 기존 엔티티 두 개를 RELATED_TO 관계로 연결한다. */
@@ -234,8 +265,16 @@ useEffect(() => { loadGraph() }, [loadGraph])
     localStorage.setItem('ohara:snapshots', JSON.stringify(next))
   }
 
+  /** 선택한 스냅샷을 브라우저 저장소와 화면 목록에서 삭제한다. */
+  function deleteSnapshot(snapshotId) {
+    const next = snapshots.filter(shot => shot.id !== snapshotId)
+    setSnapshots(next)
+    localStorage.setItem('ohara:snapshots', JSON.stringify(next))
+  }
+
   /** 저장된 스냅샷의 필터와 선택 상태를 현재 그래프에 복원한다. */
   function restoreSnapshot(shot) {
+    clearPath()
     setLimit(shot.limit)
     setMinStrength(shot.minStrength)
     setEdgeFilter(shot.edgeFilter)
@@ -327,11 +366,13 @@ useEffect(() => { loadGraph() }, [loadGraph])
 
       <WorkspacePanel
           show={showWorkspace}
+          dense={densePanels}
           onClose={() => setShowWorkspace(false)}
           onSelectWorkspace={(wsId) => {
               onSelectWorkspace(wsId)
               setSelectedNode(null)
               setHighlight(null)
+              clearPath()
           }}
       />
 
@@ -417,7 +458,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
           워크스페이스
         </button>
 
-        {selectedWorkspaceId && (
+        {selectedWorkspaceId !== null && selectedWorkspaceId !== 0 && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs shrink-0 pointer-events-auto">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
             워크스페이스 그래프
@@ -490,7 +531,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
 
       {showTools && (
         <div className="absolute top-16 left-4 z-30 w-80 rounded-2xl bg-gray-900/95 backdrop-blur border border-white/10 shadow-2xl overflow-hidden">
-          <form onSubmit={handleFindPath} className="p-4 border-b border-white/10">
+          <form onSubmit={handleFindPath} className={`${densePanels ? 'p-3' : 'p-4'} border-b border-white/10`}>
             <p className="text-white/50 text-xs mb-2">경로 찾기</p>
             <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
               <input
@@ -507,24 +548,27 @@ useEffect(() => { loadGraph() }, [loadGraph])
                 className="min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white/80 text-xs outline-none placeholder-white/25"
               />
             </div>
-            <div className="flex justify-between mt-2">
-              <button
-                type="button"
-                onClick={() => { setPathNodes(new Set()); setPathEdges(new Set()) }}
-                className="text-white/35 hover:text-white/60 text-xs"
-              >
-                초기화
-              </button>
+            <div className="flex justify-end mt-2">
+              {pathNodes.size > 0 && (
+                <button
+                  type="button"
+                  onClick={clearPath}
+                  className="mr-auto px-2.5 py-1.5 rounded-lg border border-red-400/20 bg-red-500/10 text-red-300/80 hover:bg-red-500/20 text-xs"
+                >
+                  경로 탐색 해제
+                </button>
+              )}
               <button
                 type="submit"
-                className="px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-400/25 text-emerald-300 text-xs hover:bg-emerald-500/25"
+                disabled={!pathFrom.trim() || !pathTo.trim()}
+                className="px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-400/25 text-emerald-300 text-xs hover:bg-emerald-500/25 disabled:bg-white/5 disabled:border-white/10 disabled:text-white/20"
               >
-                찾기
+                경로 탐색
               </button>
             </div>
           </form>
 
-          <form onSubmit={handleCreateEdge} className="p-4 border-b border-white/10">
+          <form onSubmit={handleCreateEdge} className={`${densePanels ? 'p-3' : 'p-4'} border-b border-white/10`}>
             <p className="text-white/50 text-xs mb-2">관계 연결</p>
             <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
               <input
@@ -564,7 +608,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
             <p className="mt-2 text-white/25 text-xs">이미 있는 엔티티 이름끼리 연결합니다.</p>
           </form>
 
-          <div className="p-4">
+          <div className={densePanels ? 'p-3' : 'p-4'}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-white/50 text-xs">스냅샷</p>
               <button
@@ -579,16 +623,33 @@ useEffect(() => { loadGraph() }, [loadGraph])
             ) : (
               <div className="space-y-1.5 max-h-44 overflow-y-auto">
                 {snapshots.map(shot => (
-                  <button
+                  <div
                     key={shot.id}
-                    onClick={() => restoreSnapshot(shot)}
-                    className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5"
+                    className="group flex items-center gap-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5"
                   >
-                    <p className="text-white/70 text-xs truncate">{shot.title}</p>
-                    <p className="text-white/25 text-xs mt-0.5">
-                      {new Date(shot.createdAt).toLocaleDateString('ko-KR')}
-                    </p>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => restoreSnapshot(shot)}
+                      className={`min-w-0 flex-1 text-left ${densePanels ? 'px-2.5 py-1.5' : 'px-3 py-2'}`}
+                    >
+                      <p className="text-white/70 text-xs truncate">{shot.title}</p>
+                      <p className="text-white/25 text-xs mt-0.5">
+                        {new Date(shot.createdAt).toLocaleDateString('ko-KR')}
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteSnapshot(shot.id)}
+                      className="mr-2 p-1 text-white/20 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all"
+                      title="스냅샷 삭제"
+                      aria-label={`${shot.title} 스냅샷 삭제`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                      </svg>
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -693,6 +754,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
       {/* 기사 패널 */}
       <ArticlePanel
         selectedNode={selectedNode}
+        dense={densePanels}
         onClose={() => { setSelectedNode(null); setHighlight(null) }}
         onDelete={handleNodeDeleted}
         onUpdated={loadGraph}

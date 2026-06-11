@@ -26,14 +26,14 @@ const STATUS = {
 
 // ── 문서 행 ─────────────────────────────────────────────────────────
 /** 문서 제목, 분석 상태와 삭제 버튼을 한 행으로 표시한다. */
-function DocRow({ doc, onDelete }) {
+function DocRow({ doc, dense, onDelete }) {
     const s = STATUS[doc.status] ?? STATUS.PENDING
     return (
-        <div className="group flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 transition-colors">
+        <div className={`group flex items-center hover:bg-white/5 transition-colors ${dense ? 'gap-1.5 px-2 py-1' : 'gap-3 px-4 py-2.5'}`}>
             <Icon.Globe/>
             <div className="flex-1 min-w-0">
-                <p className="text-white/80 text-xs font-medium truncate">{doc.title}</p>
-                <div className="flex items-center gap-2 mt-0.5">
+                <p className={`${dense ? 'text-[11px]' : 'text-xs'} text-white/80 font-medium truncate`}>{doc.title}</p>
+                <div className={`flex items-center ${dense ? 'gap-1' : 'gap-2 mt-0.5'}`}>
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.dot}`}/>
                     <span className={`text-xs ${s.color}`}>{s.label}</span>
                     {doc.status === 'DONE' && (
@@ -176,7 +176,7 @@ function AddUrlForm({ workspaceId, onAdded }) {
 
 // ── 워크스페이스 상세 (문서 목록) ───────────────────────────────────
 /** 선택된 워크스페이스의 문서 목록과 그래프 이동 기능을 제공한다. */
-function WorkspaceDetail({ workspace, onBack, onClose, onSelectWorkspace }) {
+function WorkspaceDetail({ workspace, dense, onBack, onClose, onSelectWorkspace }) {
     const [docs,     setDocs]     = useState([])
     const [loading,  setLoading]  = useState(true)
     const [showAdd,  setShowAdd]  = useState(false)
@@ -210,7 +210,7 @@ function WorkspaceDetail({ workspace, onBack, onClose, onSelectWorkspace }) {
     return (
         <div className="flex flex-col h-full">
             {/* 헤더 */}
-            <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10 shrink-0">
+            <div className={`flex items-center gap-3 border-b border-white/10 shrink-0 ${dense ? 'px-3 py-2.5' : 'px-4 py-4'}`}>
                 <button
                     onClick={onBack}
                     className="text-white/40 hover:text-white/70 transition-colors"
@@ -244,7 +244,7 @@ function WorkspaceDetail({ workspace, onBack, onClose, onSelectWorkspace }) {
 
             {/* URL 추가 버튼 */}
             {!isDefault && (
-                <div className="px-4 py-3 border-b border-white/5 shrink-0">
+                <div className={`${dense ? 'px-3 py-2' : 'px-4 py-3'} border-b border-white/5 shrink-0`}>
                     {showAdd ? (
                         <AddUrlForm workspaceId={workspace.id} onAdded={handleAdded}/>
                     ) : (
@@ -278,7 +278,7 @@ function WorkspaceDetail({ workspace, onBack, onClose, onSelectWorkspace }) {
                     </div>
                 ) : (
                     docs.map(doc => (
-                        <DocRow key={doc.id} doc={doc} onDelete={handleDelete}/>
+                        <DocRow key={doc.id} doc={doc} dense={dense} onDelete={handleDelete}/>
                     ))
                 )}
             </div>
@@ -288,7 +288,7 @@ function WorkspaceDetail({ workspace, onBack, onClose, onSelectWorkspace }) {
 
 // ── 워크스페이스 카드 (목록) ─────────────────────────────────────────
 /** 워크스페이스 요약과 이름 변경·삭제 버튼을 표시한다. */
-function WorkspaceCard({ workspace, onSelect, onDelete, onRename }) {
+function WorkspaceCard({ workspace, dense, onSelect, onDelete, onRename }) {
     const [editing, setEditing] = useState(false)
     const [title,   setTitle]   = useState(workspace.title)
     const inputRef = useRef()
@@ -312,7 +312,7 @@ function WorkspaceCard({ workspace, onSelect, onDelete, onRename }) {
 
     return (
         <div
-            className="group flex items-center gap-3 px-4 py-3 hover:bg-white/5 cursor-pointer transition-colors"
+            className={`group flex items-center hover:bg-white/5 cursor-pointer transition-colors ${dense ? 'gap-1.5 px-2 py-1.5' : 'gap-3 px-4 py-3'}`}
             onClick={() => !editing && onSelect(workspace)}
         >
             {/* 워크스페이스 아이콘 */}
@@ -362,7 +362,7 @@ function WorkspaceCard({ workspace, onSelect, onDelete, onRename }) {
 
 // ── 메인 패널 ────────────────────────────────────────────────────────
 /** 그래프 화면의 워크스페이스 목록과 상세 사이드 패널을 관리한다. */
-export default function WorkspacePanel({ show, onClose, onSelectWorkspace }) {
+export default function WorkspacePanel({ show, dense = false, onClose, onSelectWorkspace }) {
     const [workspaces,   setWorkspaces]   = useState([])
     const [selected,     setSelected]     = useState(null) // Workspace 객체
     const [loading,      setLoading]      = useState(true)
@@ -416,7 +416,7 @@ export default function WorkspacePanel({ show, onClose, onSelectWorkspace }) {
         <div
             className={`absolute left-0 top-0 bottom-0 z-40 flex transition-all duration-300 ease-in-out
                 ${show ? 'translate-x-0' : '-translate-x-full'}`}
-            style={{ width: '300px' }}
+            style={{ width: dense ? '260px' : '300px' }}
         >
             <div className="flex-1 bg-gray-900/95 backdrop-blur-xl border-r border-white/10 flex flex-col overflow-hidden">
 
@@ -424,6 +424,7 @@ export default function WorkspacePanel({ show, onClose, onSelectWorkspace }) {
                 {selected ? (
                     <WorkspaceDetail
                         workspace={selected}
+                        dense={dense}
                         onBack={() => setSelected(null)}
                         onClose={onClose}
                         onSelectWorkspace={onSelectWorkspace}
@@ -432,7 +433,7 @@ export default function WorkspacePanel({ show, onClose, onSelectWorkspace }) {
                     <>
                         {/* ── 워크스페이스 목록 뷰 ── */}
                         {/* 헤더 */}
-                        <div className="flex items-center justify-between px-4 py-4 border-b border-white/10 shrink-0">
+                        <div className={`flex items-center justify-between border-b border-white/10 shrink-0 ${dense ? 'px-3 py-2.5' : 'px-4 py-4'}`}>
                             <span className="text-white/60 text-sm font-semibold">워크스페이스</span>
                             <div className="flex items-center gap-2">
                                 <button
@@ -454,7 +455,7 @@ export default function WorkspacePanel({ show, onClose, onSelectWorkspace }) {
 
                         {/* 새 워크스페이스 입력 */}
                         {creating && (
-                            <form onSubmit={handleCreate} className="px-4 py-3 border-b border-white/5">
+                            <form onSubmit={handleCreate} className={`${dense ? 'px-3 py-2' : 'px-4 py-3'} border-b border-white/5`}>
                                 <div className="flex gap-2 items-center bg-white/5 border border-white/20 rounded-xl px-3 py-2">
                                     <input
                                         ref={newInputRef}
@@ -498,6 +499,7 @@ export default function WorkspacePanel({ show, onClose, onSelectWorkspace }) {
                                     <WorkspaceCard
                                         key={ws.id}
                                         workspace={ws}
+                                        dense={dense}
                                         onSelect={setSelected}
                                         onDelete={handleDelete}
                                         onRename={handleRename}

@@ -76,6 +76,100 @@ React (3000)
 | MySQL | 사용자, 로그인 토큰, 워크스페이스, 문서와 분석 상태 |
 | Neo4j | Country, Organization, Person, Article, Document 노드와 관계 |
 
+## 데이터베이스 구조
+
+### MySQL ERD
+
+![MySQL ERD](docs/images/ohara_erd.png)
+
+```mermaid
+erDiagram
+    USERS ||--o{ USER_TOKENS : "로그인 토큰 발급"
+    USERS ||--o{ WORKSPACES : "워크스페이스 소유"
+    WORKSPACES ||--o{ DOCUMENTS : "문서 포함"
+
+    USERS {
+        BIGINT id PK
+        VARCHAR username UK
+        VARCHAR email UK
+        VARCHAR password
+        DATETIME created_at
+    }
+
+    USER_TOKENS {
+        VARCHAR token PK
+        BIGINT user_id FK
+        DATETIME created_at
+    }
+
+    WORKSPACES {
+        BIGINT id PK
+        BIGINT user_id FK
+        VARCHAR title
+        VARCHAR description
+        DATETIME created_at
+        DATETIME updated_at
+    }
+
+    DOCUMENTS {
+        BIGINT id PK
+        BIGINT workspace_id FK
+        VARCHAR title
+        VARCHAR type
+        VARCHAR source_url
+        LONGTEXT content
+        VARCHAR status
+        INT entity_count
+        DATETIME uploaded_at
+    }
+```
+
+| 관계 | 의미 |
+|---|---|
+| `users 1 : N user_tokens` | 한 사용자가 여러 로그인 토큰을 발급받을 수 있습니다. |
+| `users 1 : N workspaces` | 한 사용자가 여러 워크스페이스를 소유할 수 있습니다. |
+| `workspaces 1 : N documents` | 한 워크스페이스가 여러 문서를 포함합니다. |
+
+`Workspace` 삭제 시 JPA의 `cascade = ALL`, `orphanRemoval = true` 설정으로 하위 `Document`도 함께 삭제됩니다. `documents.type`은 `URL`, `PDF`, `NOTE` 중 하나이고, `documents.status`는 `PENDING`, `ANALYZING`, `DONE`, `ERROR` 순서로 분석 상태를 나타냅니다.
+
+### Neo4j 그래프 모델
+
+Neo4j는 테이블과 외래 키 대신 노드와 관계를 사용하므로 ERD와 별도의 그래프 모델로 표현합니다.
+
+```mermaid
+flowchart LR
+    C[Country<br/>name, type, createdAt]
+    O[Organization<br/>name, type, createdAt]
+    P[Person<br/>name, type, createdAt]
+    A[Article<br/>url, title, source,<br/>publishedAt, createdAt]
+    D[Document<br/>docId, workspaceId,<br/>url, title, createdAt]
+
+    C -->|MENTIONED_IN| A
+    O -->|MENTIONED_IN| A
+    P -->|MENTIONED_IN| A
+
+    C -->|MENTIONED_IN_WORKSPACE<br/>workspaceId| D
+    O -->|MENTIONED_IN_WORKSPACE<br/>workspaceId| D
+    P -->|MENTIONED_IN_WORKSPACE<br/>workspaceId| D
+
+    C ---|RELATED_TO| O
+    C ---|RELATED_TO| P
+    O ---|RELATED_TO| P
+    C ---|RELATED_TO| C
+    O ---|RELATED_TO| O
+    P ---|RELATED_TO| P
+```
+
+`Country`, `Organization`, `Person`은 기사나 문서에서 spaCy NER로 추출한 엔티티입니다. 같은 문장에 함께 등장한 엔티티 사이에는 `RELATED_TO` 관계가 생성됩니다.
+
+| 관계 | 주요 속성 | 의미 |
+|---|---|---|
+| `MENTIONED_IN` | 없음 | 엔티티가 수집된 `Article`에 등장했음을 나타냅니다. |
+| `MENTIONED_IN_WORKSPACE` | `workspaceId` | 엔티티가 특정 워크스페이스의 `Document`에 등장했음을 나타냅니다. |
+| `RELATED_TO` | `strength`, `articleCount`, `sourceKeys`, `workspaceIds`, `workspaceDocKeys`, `firstMentioned`, `lastMentioned` | 두 엔티티의 공동 등장 강도와 출처를 저장합니다. |
+
+MySQL `documents.id`는 Neo4j `Document.docId`에 저장됩니다. 물리적인 외래 키는 아니지만, 문서 삭제와 출처 조회 시 두 데이터베이스의 같은 문서를 식별하는 연결 키로 사용됩니다.
+
 ## 프로젝트 구조
 
 ```text

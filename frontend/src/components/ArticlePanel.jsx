@@ -8,7 +8,7 @@ const BADGE = {
 }
 
 /** 선택한 엔티티의 상세 정보와 수정·삭제 동작을 제공한다. */
-export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdated, onConnect }) {
+export default function ArticlePanel({ selectedNode, dense = false, onClose, onDelete, onUpdated, onConnect }) {
   const [detail,  setDetail]  = useState(null)
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -66,12 +66,14 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdate
 
   return (
     <aside
-      className="absolute right-4 top-20 bottom-4 w-80 bg-gray-900/90 backdrop-blur border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl z-50 pointer-events-auto"
+      className={`absolute bg-gray-900/90 backdrop-blur border border-white/10 flex flex-col overflow-hidden shadow-2xl z-50 pointer-events-auto ${
+        dense ? 'right-2 top-16 bottom-2 w-72 rounded-xl' : 'right-4 top-20 bottom-4 w-80 rounded-2xl'
+      }`}
       aria-label={`${selectedNode} 노드 상세`}
     >
 
       {/* 헤더 */}
-      <div className="flex items-start justify-between p-4 border-b border-white/10">
+      <div className={`flex items-start justify-between border-b border-white/10 ${dense ? 'p-2' : 'p-4'}`}>
         <div>
           {loading
             ? <div className="h-5 w-32 bg-white/10 rounded animate-pulse"/>
@@ -156,12 +158,12 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdate
 
       {/* 관련 노드 태그 */}
       {detail?.relatedNodes?.length > 0 && (
-        <div className="px-4 py-3 border-b border-white/10">
-          <p className="text-white/40 text-xs mb-2">주요 연결</p>
-          <div className="flex flex-wrap gap-1.5">
+        <div className={`${dense ? 'px-3 py-2' : 'px-4 py-3'} border-b border-white/10`}>
+          <p className={`text-white/40 text-xs ${dense ? 'mb-1' : 'mb-2'}`}>주요 연결</p>
+          <div className={`flex flex-wrap ${dense ? 'gap-1' : 'gap-1.5'}`}>
             {detail.relatedNodes.slice(0, 8).map(n => (
               <span key={n.name}
-                className={`text-xs px-2 py-1 rounded-lg ${BADGE[n.type] ?? 'bg-white/10 text-white/70'}`}>
+                className={`text-xs px-2 rounded-lg ${dense ? 'py-0.5' : 'py-1'} ${BADGE[n.type] ?? 'bg-white/10 text-white/70'}`}>
                 {n.name}
               </span>
             ))}
@@ -172,7 +174,7 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdate
       {/* 기사 목록 */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="p-4 space-y-3">
+          <div className={`${dense ? 'p-3 space-y-2' : 'p-4 space-y-3'}`}>
             {[...Array(4)].map((_, i) => (
               <div key={i} className="space-y-1.5">
                 <div className="h-3 bg-white/10 rounded animate-pulse"/>
@@ -183,12 +185,12 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdate
         ) : detail?.recentArticles?.length ? (
           <ul className="divide-y divide-white/5">
             {detail.recentArticles.map((article, i) => (
-              <li key={i} className="px-4 py-3 hover:bg-white/5 transition-colors">
+              <li key={i} className={`${dense ? 'px-2 py-1.5' : 'px-4 py-3'} hover:bg-white/5 transition-colors`}>
                 <a href={article.url} target="_blank" rel="noopener noreferrer" className="block group">
-                  <p className="text-white text-sm leading-snug group-hover:text-blue-300 transition-colors line-clamp-2">
+                  <p className={`text-white leading-snug group-hover:text-blue-300 transition-colors line-clamp-2 ${dense ? 'text-xs' : 'text-sm'}`}>
                     {article.title}
                   </p>
-                  <div className="flex items-center gap-2 mt-1.5">
+                  <div className={`flex items-center gap-2 ${dense ? 'mt-1' : 'mt-1.5'}`}>
                     <span className="text-white/40 text-xs">{article.source}</span>
                     <span className="text-white/20 text-xs">·</span>
                     <span className="text-white/40 text-xs">
