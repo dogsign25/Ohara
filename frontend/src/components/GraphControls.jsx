@@ -1,3 +1,4 @@
+/** 그래프 노드 제한과 최소 관계 강도 필터를 조절한다. */
 export default function GraphControls({ limit, minStrength, onLimit, onMinStrength }) {
   return (
     <div className="flex items-center gap-5 bg-white/10 backdrop-blur border border-white/20 rounded-xl px-5 py-2">

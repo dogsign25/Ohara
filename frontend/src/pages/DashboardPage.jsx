@@ -13,6 +13,7 @@ const TYPE_COLOR = {
   Person: 'bg-purple-400',
 }
 
+/** 대시보드의 단일 통계 값을 카드 형태로 표시한다. */
 function StatCard({ label, value, sub }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
@@ -23,6 +24,7 @@ function StatCard({ label, value, sub }) {
   )
 }
 
+/** 데이터가 없을 때 공통 안내 영역을 표시한다. */
 function EmptyState({ children }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] p-8 text-center text-sm text-white/35">
@@ -31,6 +33,7 @@ function EmptyState({ children }) {
   )
 }
 
+/** 최근 그래프 데이터를 요약해 주요 통계와 엔티티를 보여준다. */
 export default function DashboardPage({ onOpenGraph }) {
   const [data, setData] = useState({ nodes: [], edges: [] })
   const [loading, setLoading] = useState(true)

@@ -16,19 +16,23 @@ CONSTRAINTS = [
 
 class GraphWriter:
     def __init__(self, uri, user, password):
+        """Neo4j 드라이버를 만들고 필요한 유일성 제약조건을 준비한다."""
         self._driver = GraphDatabase.driver(uri, auth=(user, password))
         self._init()
 
     def close(self):
+        """애플리케이션 종료 시 Neo4j 드라이버 연결을 닫는다."""
         self._driver.close()
 
     def _init(self):
+        """중복 엔티티 생성을 막기 위한 Neo4j 제약조건을 생성한다."""
         with self._driver.session() as s:
             for c in CONSTRAINTS:
                 s.run(c)
         logger.info("Neo4j 제약조건 완료")
 
     def write(self, result):
+        """수집 기사 하나의 문서, 엔티티, 관계를 Neo4j에 저장한다."""
         if not result.entities:
             return
         now = datetime.now(timezone.utc).isoformat()
@@ -46,6 +50,7 @@ class GraphWriter:
             )
 
     def write_batch(self, results):
+        """여러 기사 분석 결과를 개별 저장하고 성공 개수를 기록한다."""
         ok = 0
         for r in results:
             try:
@@ -56,6 +61,7 @@ class GraphWriter:
         logger.info(f"저장 완료: {ok}/{len(results)}")
 
     def write_workspace_document(self, workspace_id: int, doc_id, url: str, title: str, entities, relations=None):
+        """워크스페이스 문서와 분석 결과를 출처 식별 정보와 함께 저장한다."""
         now = datetime.now(timezone.utc).isoformat()
 
         with self._driver.session() as s:
@@ -73,6 +79,7 @@ class GraphWriter:
             )
 
     def _merge_article(self, session, article, now):
+        """기사 URL을 식별자로 사용해 Article 노드를 생성하거나 갱신한다."""
         session.run("""
             MERGE (a:Article {url: $url})
             ON CREATE SET a.title=$title, a.source=$source,
@@ -82,6 +89,7 @@ class GraphWriter:
              pub=article.published_at.isoformat(), now=now)
 
     def _merge_article_entities(self, session, article_url, entities, now):
+        """기사의 엔티티 노드를 만들고 MENTIONED_IN 관계로 연결한다."""
         for e in entities:
             session.run(f"""
                 MERGE (e:{e.etype} {{name: $name}})
@@ -93,6 +101,7 @@ class GraphWriter:
             """, name=str(e.name), etype=e.etype, url=article_url, now=now)
 
     def _merge_workspace_document(self, session, workspace_id, doc_id, url, title, now):
+        """MySQL 문서 ID 또는 URL을 기준으로 Neo4j Document 노드를 병합한다."""
         if doc_id is not None:
             session.run("""
                 MERGE (d:Document {docId: $docId})
@@ -109,6 +118,7 @@ class GraphWriter:
         """, url=url, title=title, wsId=workspace_id, now=now)
 
     def _merge_workspace_entities(self, session, workspace_id, doc_id, url, entities, now):
+        """워크스페이스 엔티티를 문서와 MENTIONED_IN_WORKSPACE로 연결한다."""
         for e in entities:
             session.run(f"""
                 MERGE (e:{e.etype} {{name: $name}})
@@ -123,6 +133,7 @@ class GraphWriter:
                  url=url, wsId=workspace_id, now=now)
 
     def _document_key(self, workspace_id, doc_id, url):
+        """관계 출처 배열에 저장할 문서 고유 키를 만든다."""
         return f"doc:{doc_id}" if doc_id is not None else f"url:{workspace_id}:{url}"
 
     def _write_related_to(
@@ -135,6 +146,7 @@ class GraphWriter:
         workspace_id=None,
         workspace_doc_key=None,
     ):
+        """엔티티 쌍의 RELATED_TO 관계와 출처·강도 메타데이터를 갱신한다."""
         pairs = relations if relations is not None else combinations(entities, 2)
 
         for x, y in pairs:

@@ -2,32 +2,35 @@
 // 워크스페이스 관련 API (서버 기반)
 
 import { getToken } from './auth.js'
+import { apiError, http, responseData } from './http.js'
 
+/** 현재 로그인 토큰을 워크스페이스 요청 헤더로 만든다. */
 function authHeaders() {
     return {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${getToken()}`,
     }
 }
 
+/** multipart 요청에 사용할 Bearer 인증 헤더를 만든다. */
 function bearerHeaders() {
     return {
         'Authorization': `Bearer ${getToken()}`,
     }
 }
 
+/** 워크스페이스 API 요청에 인증 헤더와 공통 오류 처리를 적용한다. */
 async function req(method, path, body) {
-    const res = await fetch(path, {
-        method,
-        credentials: 'include',
-        headers: authHeaders(),
-        body: body ? JSON.stringify(body) : undefined,
-    })
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.message || `API 오류 ${res.status}`)
+    try {
+        const res = await http.request({
+            method,
+            url: path.replace(/^\/api/, ''),
+            headers: authHeaders(),
+            data: body,
+        })
+        return responseData(res)
+    } catch (error) {
+        throw apiError(error)
     }
-    return res.json()
 }
 
 export const workspaceApi = {
@@ -61,17 +64,14 @@ export const workspaceApi = {
     addFile: async (workspaceId, file) => {
         const form = new FormData()
         form.append('file', file)
-        const res = await fetch(`/api/workspaces/${workspaceId}/documents/file`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: bearerHeaders(),
-            body: form,
-        })
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.message || `API 오류 ${res.status}`)
+        try {
+            const res = await http.post(`/workspaces/${workspaceId}/documents/file`, form, {
+                headers: bearerHeaders(),
+            })
+            return responseData(res)
+        } catch (error) {
+            throw apiError(error)
         }
-        return res.json()
     },
 
     // 문서 삭제

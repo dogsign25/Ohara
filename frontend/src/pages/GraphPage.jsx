@@ -15,15 +15,25 @@ const NODE_COLOR = {
   Person:       '#c084fc',
 }
 
+/** 노드 연결 수를 화면 반지름으로 변환한다. */
 const getNodeRadius = (degree) => Math.sqrt(degree + 1) * 1.5 + 2.5
 
+/** 방향과 무관하게 같은 관계를 식별할 수 있는 키를 만든다. */
 const edgeKey = (link) => {
   const sourceId = typeof link.source === 'object' ? link.source.id : link.source
   const targetId = typeof link.target === 'object' ? link.target.id : link.target
   return [sourceId, targetId].sort().join('::')
 }
 
-export default function GraphPage({ user, onLogout, activePage = 'graph', onNavigate }) {
+/** Neo4j 그래프 탐색, 필터, 경로 찾기와 관계 편집을 담당하는 메인 화면이다. */
+export default function GraphPage({
+  user,
+  onLogout,
+  activePage = 'graph',
+  onNavigate,
+  selectedWorkspaceId,
+  onSelectWorkspace,
+}) {
   const fgRef = useRef()
 
   const [graphData,    setGraphData]    = useState({ nodes: [], links: [] })
@@ -38,13 +48,16 @@ export default function GraphPage({ user, onLogout, activePage = 'graph', onNavi
   const [showFilter,     setShowFilter]     = useState(false)
   const [showWorkspace,  setShowWorkspace]  = useState(false)
   const [showTools,      setShowTools]      = useState(false)
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(0)
   const [selectedEdge, setSelectedEdge] = useState(null)
   const [edgeSources,  setEdgeSources]  = useState([])
   const [pathNodes,    setPathNodes]    = useState(new Set())
   const [pathEdges,    setPathEdges]    = useState(new Set())
   const [pathFrom,     setPathFrom]     = useState('')
   const [pathTo,       setPathTo]       = useState('')
+  const [edgeFrom,     setEdgeFrom]     = useState('')
+  const [edgeTo,       setEdgeTo]       = useState('')
+  const [edgeStrength, setEdgeStrength] = useState(1)
+  const [creatingEdge, setCreatingEdge] = useState(false)
   const [snapshots,    setSnapshots]    = useState(() => {
     try { return JSON.parse(localStorage.getItem('ohara:snapshots') || '[]') }
     catch { return [] }
@@ -99,6 +112,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
   }, [filtered])
 
   // ── 검색 → 노드 포커스 ─────────────────────────────────────────
+  /** 검색 결과 노드를 선택하고 그래프 카메라를 해당 위치로 이동한다. */
   function handleSearch(node) {
     setSelectedNode(node.name)
     setHighlight(node.name)
@@ -109,6 +123,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
     }
   }
 
+  /** 삭제된 노드를 현재 그래프와 선택 상태에서 제거한다. */
   function handleNodeDeleted(name) {
     setGraphData(prev => ({
       nodes: prev.nodes.filter(n => n.id !== name),
@@ -122,6 +137,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
     setHighlight(null)
   }
 
+  /** 선택한 관계의 원본 기사 또는 워크스페이스 문서를 조회한다. */
   async function handleLinkClick(link) {
     const sourceId = typeof link.source === 'object' ? link.source.id : link.source
     const targetId = typeof link.target === 'object' ? link.target.id : link.target
@@ -137,6 +153,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
     }
   }
 
+  /** 입력된 두 엔티티 사이의 Neo4j 최단 경로를 조회한다. */
   async function handleFindPath(e) {
     e.preventDefault()
     if (!pathFrom.trim() || !pathTo.trim()) return
@@ -156,6 +173,47 @@ useEffect(() => { loadGraph() }, [loadGraph])
     }
   }
 
+  /** 기존 엔티티 두 개를 RELATED_TO 관계로 연결한다. */
+  async function handleCreateEdge(e) {
+    e.preventDefault()
+    if (!edgeFrom.trim() || !edgeTo.trim()) return
+    setCreatingEdge(true)
+    try {
+      const edge = await api.createEdge({
+        source: edgeFrom.trim(),
+        target: edgeTo.trim(),
+        strength: Number(edgeStrength) || 1,
+        workspaceId: selectedWorkspaceId || undefined,
+      })
+      setGraphData(prev => {
+        const key = edgeKey(edge)
+        const exists = prev.links.some(link => edgeKey(link) === key)
+        const links = exists
+          ? prev.links.map(link => edgeKey(link) === key ? edge : link)
+          : [edge, ...prev.links]
+        return { ...prev, links }
+      })
+      setPathNodes(new Set([edge.source, edge.target]))
+      setPathEdges(new Set([edgeKey(edge)]))
+      setEdgeFrom('')
+      setEdgeTo('')
+      setEdgeStrength(1)
+      await loadGraph()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setCreatingEdge(false)
+    }
+  }
+
+  /** 특정 노드를 출발점으로 관계 연결 도구를 연다. */
+  function openEdgeTool(source = '') {
+    setEdgeFrom(source)
+    setEdgeTo('')
+    setShowTools(true)
+  }
+
+  /** 현재 그래프 필터와 선택 상태를 브라우저 스냅샷으로 저장한다. */
   function saveSnapshot() {
     const title = prompt('스냅샷 이름을 입력하세요', `Snapshot ${snapshots.length + 1}`)
     if (!title) return
@@ -176,12 +234,13 @@ useEffect(() => { loadGraph() }, [loadGraph])
     localStorage.setItem('ohara:snapshots', JSON.stringify(next))
   }
 
+  /** 저장된 스냅샷의 필터와 선택 상태를 현재 그래프에 복원한다. */
   function restoreSnapshot(shot) {
     setLimit(shot.limit)
     setMinStrength(shot.minStrength)
     setEdgeFilter(shot.edgeFilter)
     setDays(shot.days || '')
-    setSelectedWorkspaceId(shot.selectedWorkspaceId)
+    onSelectWorkspace(shot.selectedWorkspaceId)
     setSelectedNode(shot.selectedNode)
     setHighlight(shot.highlight)
   }
@@ -222,7 +281,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
     const r = getNodeRadius(node.degree ?? 0)
     ctx.fillStyle = color
     ctx.beginPath()
-    ctx.arc(node.x, node.y, r, 0, 2 * Math.PI)
+    ctx.arc(node.x, node.y, Math.max(r + 6, 12), 0, 2 * Math.PI)
     ctx.fill()
   }, [])
 
@@ -270,7 +329,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
           show={showWorkspace}
           onClose={() => setShowWorkspace(false)}
           onSelectWorkspace={(wsId) => {
-              setSelectedWorkspaceId(wsId)
+              onSelectWorkspace(wsId)
               setSelectedNode(null)
               setHighlight(null)
           }}
@@ -332,7 +391,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
         <select
           value={days}
           onChange={e => setDays(e.target.value)}
-          className="pointer-events-auto bg-white/5 border border-white/10 text-white/60 text-xs rounded-xl px-2 py-2 outline-none hover:bg-white/10"
+          className="ohara-select pointer-events-auto shrink-0 bg-white/5 border border-white/10 text-white/65 text-xs rounded-xl px-2.5 py-2 outline-none hover:bg-white/10 focus:border-blue-400/35 focus:bg-white/10"
           title="시간 필터"
         >
           <option value="">전체 기간</option>
@@ -363,7 +422,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
             워크스페이스 그래프
             <button
-              onClick={() => setSelectedWorkspaceId(null)}
+              onClick={() => onSelectWorkspace(null)}
               className="text-blue-400/60 hover:text-blue-300 ml-1"
             >
               ✕
@@ -397,7 +456,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 4.5L21 12l-7.5 7.5M21 12H3"/>
           </svg>
-          탐색
+          경로·연결
         </button>
 
         {/* 통계 */}
@@ -465,6 +524,46 @@ useEffect(() => { loadGraph() }, [loadGraph])
             </div>
           </form>
 
+          <form onSubmit={handleCreateEdge} className="p-4 border-b border-white/10">
+            <p className="text-white/50 text-xs mb-2">관계 연결</p>
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+              <input
+                value={edgeFrom}
+                onChange={e => setEdgeFrom(e.target.value)}
+                placeholder="노드 A"
+                className="min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white/80 text-xs outline-none placeholder-white/25 focus:border-blue-400/35"
+              />
+              <span className="text-white/20 text-xs">↔</span>
+              <input
+                value={edgeTo}
+                onChange={e => setEdgeTo(e.target.value)}
+                placeholder="노드 B"
+                className="min-w-0 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white/80 text-xs outline-none placeholder-white/25 focus:border-blue-400/35"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-2">
+              <label className="flex items-center gap-2 text-white/35 text-xs">
+                강도
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={edgeStrength}
+                  onChange={e => setEdgeStrength(e.target.value)}
+                  className="w-16 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white/80 text-xs outline-none focus:border-blue-400/35"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={creatingEdge || !edgeFrom.trim() || !edgeTo.trim()}
+                className="px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-400/25 text-blue-300 text-xs hover:bg-blue-500/25 disabled:bg-white/5 disabled:border-white/10 disabled:text-white/20"
+              >
+                {creatingEdge ? '연결 중...' : '연결'}
+              </button>
+            </div>
+            <p className="mt-2 text-white/25 text-xs">이미 있는 엔티티 이름끼리 연결합니다.</p>
+          </form>
+
           <div className="p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-white/50 text-xs">스냅샷</p>
@@ -518,34 +617,36 @@ useEffect(() => { loadGraph() }, [loadGraph])
       )}
 
       {/* 그래프 */}
-      <ForceGraph2D
-        ref={fgRef}
-        graphData={filtered}
-        backgroundColor="#030712"
-        nodeCanvasObject={paintNode}
-        nodePointerAreaPaint={nodePointer}
-        linkWidth={linkWidth}
-        linkColor={getLinkColor}
-        onNodeClick={node => {
-          setSelectedNode(node.id)
-          setHighlight(node.id)
-          setSelectedEdge(null)
-        }}
-        onBackgroundClick={() => {
-          setSelectedNode(null)
-          setHighlight(null)
-          setSelectedEdge(null)
-        }}
-        onLinkClick={handleLinkClick}
-        onNodeDrag={node => {
-          setHighlight(node.id)
-        }}
-        onNodeDragEnd={node => {
-          setSelectedNode(node.id)
-          setHighlight(node.id)
-        }}
-        cooldownTicks={100}
-      />
+      <div className="absolute inset-0 z-0">
+        <ForceGraph2D
+          ref={fgRef}
+          graphData={filtered}
+          backgroundColor="#030712"
+          nodeCanvasObject={paintNode}
+          nodePointerAreaPaint={nodePointer}
+          linkWidth={linkWidth}
+          linkColor={getLinkColor}
+          onNodeClick={node => {
+            setSelectedNode(node.id)
+            setHighlight(node.id)
+            setSelectedEdge(null)
+          }}
+          onBackgroundClick={() => {
+            setSelectedNode(null)
+            setHighlight(null)
+            setSelectedEdge(null)
+          }}
+          onLinkClick={handleLinkClick}
+          onNodeDrag={node => {
+            setHighlight(node.id)
+          }}
+          onNodeDragEnd={node => {
+            setSelectedNode(node.id)
+            setHighlight(node.id)
+          }}
+          cooldownTicks={100}
+        />
+      </div>
 
       {selectedEdge && (
         <div className="absolute right-4 top-20 w-80 bg-gray-900/90 backdrop-blur border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-40">
@@ -595,6 +696,7 @@ useEffect(() => { loadGraph() }, [loadGraph])
         onClose={() => { setSelectedNode(null); setHighlight(null) }}
         onDelete={handleNodeDeleted}
         onUpdated={loadGraph}
+        onConnect={openEdgeTool}
       />
     </div>
   )

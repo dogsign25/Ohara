@@ -8,6 +8,7 @@ const STATUS = {
   ERROR: { label: '오류', dot: 'bg-red-400', text: 'text-red-300' },
 }
 
+/** 워크스페이스 페이지의 공통 카드 영역을 렌더링한다. */
 function Panel({ title, children, action }) {
   return (
     <section className="rounded-lg border border-white/10 bg-white/[0.03]">
@@ -20,6 +21,7 @@ function Panel({ title, children, action }) {
   )
 }
 
+/** 워크스페이스 생성과 URL 문서 관리를 제공하는 독립 페이지다. */
 export default function WorkspacePage({ onOpenGraph }) {
   const [workspaces, setWorkspaces] = useState([])
   const [selected, setSelected] = useState(null)
@@ -31,6 +33,7 @@ export default function WorkspacePage({ onOpenGraph }) {
   const [url, setUrl] = useState('')
   const [error, setError] = useState('')
 
+  /** 로그인 사용자의 워크스페이스 목록을 서버에서 불러온다. */
   async function loadWorkspaces() {
     setLoading(true)
     setError('')
@@ -45,6 +48,7 @@ export default function WorkspacePage({ onOpenGraph }) {
     }
   }
 
+  /** 선택한 워크스페이스의 문서 목록을 불러온다. */
   async function loadDocs(workspace) {
     if (!workspace) return
     setDocLoading(true)
@@ -61,6 +65,7 @@ export default function WorkspacePage({ onOpenGraph }) {
   useEffect(() => { loadWorkspaces() }, [])
   useEffect(() => { loadDocs(selected) }, [selected])
 
+  /** 입력된 제목과 설명으로 새 워크스페이스를 생성한다. */
   async function handleCreate(e) {
     e.preventDefault()
     if (!title.trim()) return
@@ -75,6 +80,7 @@ export default function WorkspacePage({ onOpenGraph }) {
     }
   }
 
+  /** 선택한 워크스페이스에 URL 분석 문서를 추가한다. */
   async function handleAddUrl(e) {
     e.preventDefault()
     if (!selected || !url.trim()) return
@@ -87,6 +93,7 @@ export default function WorkspacePage({ onOpenGraph }) {
     }
   }
 
+  /** 문서를 MySQL과 Neo4j에서 삭제하고 화면 목록에서도 제거한다. */
   async function handleDeleteDoc(docId) {
     if (!selected) return
     try {
@@ -106,7 +113,8 @@ export default function WorkspacePage({ onOpenGraph }) {
           <p className="mt-2 text-sm text-white/40">URL과 문서를 모아 별도 그래프로 분석합니다.</p>
         </div>
         <button
-          onClick={onOpenGraph}
+          onClick={() => onOpenGraph(selected?.id ?? 0)}
+          disabled={!selected}
           className="w-fit rounded-lg border border-blue-400/25 bg-blue-500/15 px-4 py-2 text-sm text-blue-200 transition-colors hover:bg-blue-500/25"
         >
           선택 그래프 열기

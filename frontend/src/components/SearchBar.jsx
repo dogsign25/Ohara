@@ -7,6 +7,7 @@ const TYPE_STYLE = {
   Person:       'bg-purple-500/20 text-purple-300',
 }
 
+/** 엔티티 이름을 검색하고 선택 결과를 그래프에 전달한다. */
 export default function SearchBar({ onSelect }) {
   const [query,   setQuery]   = useState('')
   const [results, setResults] = useState([])
@@ -32,6 +33,7 @@ export default function SearchBar({ onSelect }) {
     return () => clearTimeout(timer.current)
   }, [query])
 
+  /** 검색 결과를 확정하고 입력창과 결과 목록을 초기화한다. */
   function handleSelect(node) {
     setQuery(node.name)
     setOpen(false)

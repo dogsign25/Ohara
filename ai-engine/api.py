@@ -20,7 +20,6 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 
 from nlp.extractor import extract_batch
-from nlp.normalizer import get_canonical_name, get_entity_type
 from crawler.collector import Article
 from processor.graph_writer import GraphWriter
 
@@ -190,10 +189,11 @@ def _save_to_neo4j(workspace_id: int, doc_id, url: str, title: str, entities, re
     try:
         writer.write_workspace_document(workspace_id, doc_id, url, title, entities, relations)
     except Exception as e:
-        print(f"[Neo4j 저장 실패] {e}")
+        raise HTTPException(status_code=503, detail=f"Neo4j 저장 실패: {e}") from e
 
 
 # ── 헬스체크 ───────────────────────────────────────────────────────
 @app.get("/health")
 def health():
+    """AI Engine 프로세스가 요청을 받을 수 있는지 확인하는 헬스체크 응답이다."""
     return {"status": "ok"}

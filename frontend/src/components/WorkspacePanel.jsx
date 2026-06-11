@@ -25,6 +25,7 @@ const STATUS = {
 }
 
 // ── 문서 행 ─────────────────────────────────────────────────────────
+/** 문서 제목, 분석 상태와 삭제 버튼을 한 행으로 표시한다. */
 function DocRow({ doc, onDelete }) {
     const s = STATUS[doc.status] ?? STATUS.PENDING
     return (
@@ -51,6 +52,7 @@ function DocRow({ doc, onDelete }) {
 }
 
 // ── URL 입력 폼 ──────────────────────────────────────────────────────
+/** URL·텍스트·파일 중 하나를 선택해 워크스페이스 문서로 추가한다. */
 function AddUrlForm({ workspaceId, onAdded }) {
     const [mode,    setMode]    = useState('url')
     const [url,     setUrl]     = useState('')
@@ -63,6 +65,7 @@ function AddUrlForm({ workspaceId, onAdded }) {
 
     useEffect(() => { inputRef.current?.focus() }, [])
 
+    /** 선택된 입력 방식의 값을 검증하고 문서 추가 API를 호출한다. */
     async function handleSubmit(e) {
         e.preventDefault()
         if (mode === 'url' && !url.trim()) return
@@ -172,6 +175,7 @@ function AddUrlForm({ workspaceId, onAdded }) {
 }
 
 // ── 워크스페이스 상세 (문서 목록) ───────────────────────────────────
+/** 선택된 워크스페이스의 문서 목록과 그래프 이동 기능을 제공한다. */
 function WorkspaceDetail({ workspace, onBack, onClose, onSelectWorkspace }) {
     const [docs,     setDocs]     = useState([])
     const [loading,  setLoading]  = useState(true)
@@ -189,6 +193,7 @@ function WorkspaceDetail({ workspace, onBack, onClose, onSelectWorkspace }) {
 
     useEffect(() => { load() }, [load])
 
+    /** 문서를 삭제한 뒤 상세 목록에서 제거한다. */
     async function handleDelete(docId) {
         try {
             await workspaceApi.deleteDocument(workspace.id, docId)
@@ -196,6 +201,7 @@ function WorkspaceDetail({ workspace, onBack, onClose, onSelectWorkspace }) {
         } catch (err) { alert(err.message) }
     }
 
+    /** 새 문서를 목록 맨 앞에 추가하고 입력 폼을 닫는다. */
     function handleAdded(doc) {
         setDocs(prev => [doc, ...prev])
         setShowAdd(false)
@@ -281,6 +287,7 @@ function WorkspaceDetail({ workspace, onBack, onClose, onSelectWorkspace }) {
 }
 
 // ── 워크스페이스 카드 (목록) ─────────────────────────────────────────
+/** 워크스페이스 요약과 이름 변경·삭제 버튼을 표시한다. */
 function WorkspaceCard({ workspace, onSelect, onDelete, onRename }) {
     const [editing, setEditing] = useState(false)
     const [title,   setTitle]   = useState(workspace.title)
@@ -289,6 +296,7 @@ function WorkspaceCard({ workspace, onSelect, onDelete, onRename }) {
 
     useEffect(() => { if (editing) inputRef.current?.focus() }, [editing])
 
+    /** 편집 중인 제목을 검증하고 서버에 변경을 저장한다. */
     async function commitRename() {
         setEditing(false)
         if (title.trim() && title !== workspace.title) {
@@ -353,6 +361,7 @@ function WorkspaceCard({ workspace, onSelect, onDelete, onRename }) {
 }
 
 // ── 메인 패널 ────────────────────────────────────────────────────────
+/** 그래프 화면의 워크스페이스 목록과 상세 사이드 패널을 관리한다. */
 export default function WorkspacePanel({ show, onClose, onSelectWorkspace }) {
     const [workspaces,   setWorkspaces]   = useState([])
     const [selected,     setSelected]     = useState(null) // Workspace 객체
@@ -374,6 +383,7 @@ export default function WorkspacePanel({ show, onClose, onSelectWorkspace }) {
     useEffect(() => { if (show) loadWorkspaces() }, [show, loadWorkspaces])
     useEffect(() => { if (creating) newInputRef.current?.focus() }, [creating])
 
+    /** 새 워크스페이스를 생성하고 생성된 상세 화면으로 이동한다. */
     async function handleCreate(e) {
         e.preventDefault()
         if (!newTitle.trim()) return
@@ -386,6 +396,7 @@ export default function WorkspacePanel({ show, onClose, onSelectWorkspace }) {
         } catch (err) { alert(err.message) }
     }
 
+    /** 확인 후 워크스페이스와 하위 문서를 삭제한다. */
     async function handleDelete(id) {
         if (!confirm('워크스페이스를 삭제할까요?')) return
         try {
@@ -395,6 +406,7 @@ export default function WorkspacePanel({ show, onClose, onSelectWorkspace }) {
         } catch (err) { alert(err.message) }
     }
 
+    /** 워크스페이스 제목을 변경하고 목록 응답을 갱신한다. */
     async function handleRename(id, title) {
         const ws = await workspaceApi.rename(id, title)
         setWorkspaces(prev => prev.map(w => w.id === id ? ws : w))

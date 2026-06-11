@@ -7,7 +7,8 @@ const BADGE = {
   Person:       'bg-purple-500/30 text-purple-200',
 }
 
-export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdated }) {
+/** 선택한 엔티티의 상세 정보와 수정·삭제 동작을 제공한다. */
+export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdated, onConnect }) {
   const [detail,  setDetail]  = useState(null)
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -30,6 +31,7 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdate
 
   if (!selectedNode) return null
 
+  /** 확인 후 선택한 Neo4j 엔티티 노드를 삭제한다. */
   async function handleDelete() {
     if (!confirm(`'${selectedNode}' 노드를 삭제할까요? 연결 관계도 함께 삭제됩니다.`)) return
     setDeleting(true)
@@ -44,6 +46,7 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdate
     }
   }
 
+  /** 변경된 엔티티 이름과 타입을 서버에 저장한다. */
   async function handleUpdate(e) {
     e.preventDefault()
     if (!editName.trim()) return
@@ -62,7 +65,10 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdate
   }
 
   return (
-    <div className="absolute right-4 top-20 bottom-4 w-80 bg-gray-900/90 backdrop-blur border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl z-40">
+    <aside
+      className="absolute right-4 top-20 bottom-4 w-80 bg-gray-900/90 backdrop-blur border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-2xl z-50 pointer-events-auto"
+      aria-label={`${selectedNode} 노드 상세`}
+    >
 
       {/* 헤더 */}
       <div className="flex items-start justify-between p-4 border-b border-white/10">
@@ -81,7 +87,7 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdate
                     <select
                       value={editType}
                       onChange={e => setEditType(e.target.value)}
-                      className="flex-1 bg-gray-950 border border-white/15 rounded-lg px-2 py-1.5 text-white/80 text-xs outline-none"
+                      className="ohara-select flex-1 bg-gray-950 border border-white/15 rounded-lg px-2 py-1.5 text-white/80 text-xs outline-none"
                     >
                       <option>Country</option>
                       <option>Organization</option>
@@ -107,6 +113,16 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdate
           }
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => onConnect?.(detail?.name ?? selectedNode)}
+            className="text-white/35 hover:text-emerald-300 transition-colors"
+            title="다른 노드와 관계 연결"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M13.828 10.172a4 4 0 010 5.656l-2 2a4 4 0 01-5.656-5.656l1-1m3-3 2-2a4 4 0 015.656 5.656l-1 1"/>
+            </svg>
+          </button>
           <button
             onClick={() => setEditing(v => !v)}
             className="text-white/35 hover:text-blue-300 transition-colors"
@@ -189,6 +205,6 @@ export default function ArticlePanel({ selectedNode, onClose, onDelete, onUpdate
           <p className="text-white/30 text-sm text-center mt-8">관련 기사 없음</p>
         )}
       </div>
-    </div>
+    </aside>
   )
 }

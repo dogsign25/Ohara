@@ -11,6 +11,7 @@ const FILTERS = [
   { key: 'OP',          label: '🏛↔👤 조직-인물',     color: 'bg-pink-500/30 text-pink-300' },
 ]
 
+/** 그래프 관계 표시 기준을 선택하는 필터 패널이다. */
 export default function FilterPanel({ active, onChange }) {
   return (
     <div className="flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 rounded-xl px-4 py-2 flex-wrap">

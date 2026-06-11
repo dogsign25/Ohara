@@ -13,6 +13,7 @@ const PAGES = [
   { key: 'settings', label: '설정' },
 ]
 
+/** 상단 내비게이션에서 사용하는 OHARA 로고를 렌더링한다. */
 function Logo() {
   return (
     <div className="flex items-center gap-2">
@@ -32,6 +33,7 @@ function Logo() {
   )
 }
 
+/** 그래프 외 페이지에 공통 헤더와 본문 레이아웃을 제공한다. */
 function PageShell({ activePage, onNavigate, user, onLogout, children }) {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -71,8 +73,16 @@ function PageShell({ activePage, onNavigate, user, onLogout, children }) {
   )
 }
 
+/** 로그인 이후 페이지 전환과 선택 워크스페이스 상태를 관리한다. */
 export default function App({ user, onLogout }) {
   const [activePage, setActivePage] = useState('graph')
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(0)
+
+  /** 워크스페이스 페이지에서 선택한 그래프로 이동한다. */
+  function openWorkspaceGraph(workspaceId) {
+    setSelectedWorkspaceId(workspaceId)
+    setActivePage('graph')
+  }
 
   if (activePage === 'graph') {
     return (
@@ -81,13 +91,15 @@ export default function App({ user, onLogout }) {
         onLogout={onLogout}
         activePage={activePage}
         onNavigate={setActivePage}
+        selectedWorkspaceId={selectedWorkspaceId}
+        onSelectWorkspace={setSelectedWorkspaceId}
       />
     )
   }
 
   const pages = {
     dashboard: <DashboardPage onOpenGraph={() => setActivePage('graph')} />,
-    workspaces: <WorkspacePage onOpenGraph={() => setActivePage('graph')} />,
+    workspaces: <WorkspacePage onOpenGraph={openWorkspaceGraph} />,
     sources: <SourcesPage />,
     settings: <SettingsPage />,
   }

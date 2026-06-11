@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 // 간단한 인터랙티브 캔버스 배경 (노드-엣지 그래프 시뮬레이션)
+/** 랜딩 배경에서 움직이는 관계 그래프 캔버스를 그린다. */
 function GraphCanvas() {
   const ref = useRef()
 
@@ -82,10 +83,11 @@ function GraphCanvas() {
 }
 
 // 통계 카드
+/** 서비스 소개용 통계 항목을 표시한다. */
 function Stat({ value, label }) {
   return (
     <div className="flex flex-col items-center gap-1">
-      <span className="text-2xl font-bold text-white tracking-tight" style={{ fontFamily: "'Courier New', monospace" }}>
+      <span className="text-2xl font-semibold text-white tracking-tight">
         {value}
       </span>
       <span className="text-white/35 text-xs uppercase tracking-widest">{label}</span>
@@ -94,6 +96,7 @@ function Stat({ value, label }) {
 }
 
 // 기능 카드
+/** 핵심 기능 하나를 아이콘·제목·설명으로 표시한다. */
 function Feature({ icon, title, desc }) {
   return (
     <div className="border border-white/8 rounded-2xl p-5 bg-white/3 hover:bg-white/6 hover:border-white/15 transition-all duration-300">
@@ -104,9 +107,10 @@ function Feature({ icon, title, desc }) {
   )
 }
 
+/** 로그인 전 서비스 소개와 시작 버튼을 제공하는 랜딩 화면이다. */
 export default function Landing({ onLogin, onRegister }) {
   return (
-    <div className="min-h-screen bg-[#050810] relative overflow-hidden flex flex-col">
+    <div className="landing-page min-h-screen bg-[#050810] relative overflow-hidden flex flex-col">
       {/* 배경 그래프 애니메이션 */}
       <GraphCanvas />
 
@@ -114,12 +118,14 @@ export default function Landing({ onLogin, onRegister }) {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse 60% 50% at 50% 40%, rgba(96,165,250,0.06) 0%, transparent 70%)',
+          background: 'radial-gradient(ellipse 70% 58% at 50% 38%, rgba(59,130,246,0.14) 0%, rgba(124,58,237,0.05) 42%, transparent 72%)',
         }}
       />
+      <div className="landing-orb landing-orb-left" />
+      <div className="landing-orb landing-orb-right" />
 
       {/* 네비게이션 */}
-      <nav className="relative z-10 flex items-center justify-between px-8 py-5">
+      <nav className="landing-nav relative z-10 flex items-center justify-between px-6 sm:px-10 py-6">
         <div className="flex items-center gap-2">
           {/* 로고 마크 */}
           <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
@@ -133,7 +139,7 @@ export default function Landing({ onLogin, onRegister }) {
             <line x1="11" y1="11" x2="4"  y2="18" stroke="rgba(255,255,255,0.2)" strokeWidth="0.8"/>
             <line x1="11" y1="11" x2="18" y2="17" stroke="rgba(255,255,255,0.2)" strokeWidth="0.8"/>
           </svg>
-          <span className="text-white font-bold tracking-widest text-sm uppercase">OHARA</span>
+          <span className="text-white font-semibold tracking-[0.24em] text-sm uppercase">OHARA</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -153,53 +159,39 @@ export default function Landing({ onLogin, onRegister }) {
       </nav>
 
       {/* 히어로 */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-8 text-center">
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-16 sm:py-20 text-center">
         {/* 배지 */}
-        <div className="inline-flex items-center gap-2 border border-blue-400/20 bg-blue-400/5 rounded-full px-4 py-1.5 mb-8">
+        <div className="landing-reveal landing-reveal-1 inline-flex items-center gap-2 border border-blue-300/20 bg-blue-400/[0.07] rounded-full px-4 py-2 mb-7 backdrop-blur-sm">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-          <span className="text-blue-300/80 text-xs tracking-widest uppercase">실시간 글로벌 인텔리전스</span>
+          <span className="text-blue-200/80 text-[11px] tracking-[0.22em] uppercase">Global Intelligence Graph</span>
         </div>
 
         {/* 헤드라인 */}
-        <h1
-          className="text-white mb-5 leading-none"
-          style={{
-            fontFamily: "'Courier New', monospace",
-            fontSize: 'clamp(2.8rem, 7vw, 5.5rem)',
-            fontWeight: 900,
-            letterSpacing: '-0.02em',
-          }}
-        >
-          세계는<br />
-          <span style={{ color: '#60a5fa' }}>연결</span>되어 있다
+        <h1 className="landing-title mb-7">
+          Ohara
         </h1>
 
-        <p className="text-white/40 mb-10 max-w-md leading-relaxed" style={{ fontSize: '0.95rem' }}>
-          뉴스에서 자동 추출한 국가·기관·인물의 관계를
-          실시간 인터랙티브 그래프로 시각화합니다.
-        </p>
-
         {/* CTA */}
-        <div className="flex items-center gap-3 mb-16">
+        <div className="landing-reveal landing-reveal-4 flex flex-col sm:flex-row items-center gap-3 mb-16">
           <button
             onClick={onRegister}
-            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 text-sm"
+            className="landing-primary-button flex items-center gap-3 bg-white text-[#07101f] font-semibold px-7 py-3.5 rounded-full transition-all duration-300 text-sm"
           >
-            무료로 시작하기
+            Ohara 시작하기
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3"/>
             </svg>
           </button>
           <button
             onClick={onLogin}
-            className="text-white/50 hover:text-white/80 text-sm px-4 py-3 transition-colors"
+            className="text-white/45 hover:text-white/90 text-sm px-5 py-3 transition-colors duration-300"
           >
-            이미 계정이 있어요 →
+            로그인
           </button>
         </div>
 
         {/* 통계 */}
-        <div className="flex items-center gap-10 mb-6">
+        <div className="landing-reveal landing-reveal-5 flex items-center gap-6 sm:gap-10 mb-6">
           <Stat value="8+" label="뉴스 소스" />
           <div className="w-px h-8 bg-white/10" />
           <Stat value="5분" label="업데이트 주기" />

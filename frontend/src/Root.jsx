@@ -6,6 +6,7 @@ import Register from './components/Register.jsx'
 import App from './App.jsx'
 
 // page: 'landing' | 'login' | 'register' | 'graph'
+/** 저장된 인증 상태를 복원하고 로그인 전후 최상위 화면을 전환한다. */
 export default function Root() {
   const [page, setPage]   = useState('landing')
   const [user, setUser]   = useState(null)
@@ -18,6 +19,14 @@ export default function Root() {
     if (saved) {
       setUser(saved)
       setPage('graph')
+    }
+
+    if (!token) {
+      clearAuth()
+      setUser(null)
+      setPage('landing')
+      setReady(true)
+      return
     }
 
     authApi.me(token)
@@ -33,16 +42,20 @@ export default function Root() {
         }
       })
       .catch(() => {
-        if (!saved) clearAuth()
+        clearAuth()
+        setUser(null)
+        setPage('landing')
       })
       .finally(() => setReady(true))
   }, [])
 
+  /** 로그인·회원가입 성공 사용자를 애플리케이션 화면으로 보낸다. */
   function handleLoginSuccess(username) {
     setUser(username)
     setPage('graph')
   }
 
+  /** 서버 로그아웃을 요청하고 브라우저 인증 정보를 제거한다. */
   function handleLogout() {
     const token = getToken()
     if (token) authApi.logout(token).catch(() => {})

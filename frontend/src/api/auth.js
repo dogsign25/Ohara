@@ -1,4 +1,6 @@
 // 토큰을 브라우저 세션에 저장/조회
+import { apiError, http, responseData } from './http.js'
+
 export const getToken = () => sessionStorage.getItem('ohara_token') || localStorage.getItem('ohara_token')
 export const getUser  = () => sessionStorage.getItem('ohara_user') || localStorage.getItem('ohara_user')
 
@@ -16,35 +18,30 @@ export const clearAuth = () => {
   localStorage.removeItem('ohara_user')
 }
 
-async function post(path, body) {
-  const res = await fetch(path, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.message || `API 오류 ${res.status}`)
-  return data
+/** 인증 API 응답을 변환하고 서버 오류를 사용자용 Error로 바꾼다. */
+async function request(call) {
+  try {
+    const res = await call()
+    return responseData(res)
+  } catch (error) {
+    throw apiError(error)
+  }
 }
 
 export const authApi = {
   register: (username, email, password) =>
-    post('/api/auth/register', { username, email, password }),
+    request(() => http.post('/auth/register', { username, email, password })),
 
   login: (username, password) =>
-    post('/api/auth/login', { username, password }),
+    request(() => http.post('/auth/login', { username, password })),
 
   logout: (token) =>
-    fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include',
+    http.post('/auth/logout', undefined, {
       headers: { Authorization: `Bearer ${token}` },
-    }),
+    }).then(responseData),
 
   me: (token) =>
-    fetch('/api/auth/me', {
-      credentials: 'include',
+    http.get('/auth/me', {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
-    }).then(r => r.json()),
+    }).then(responseData),
 }

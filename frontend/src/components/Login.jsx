@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { authApi, saveAuth } from '../api/auth.js'
 
+/** 사용자 로그인을 처리하고 성공 시 상위 인증 상태를 갱신한다. */
 export default function Login({ onSuccess, onGoRegister, onGoLanding }) {
   const [form,    setForm]    = useState({ username: '', password: '' })
   const [error,   setError]   = useState('')
@@ -8,6 +9,7 @@ export default function Login({ onSuccess, onGoRegister, onGoLanding }) {
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
 
+  /** 로그인 폼을 검증한 뒤 인증 API를 호출한다. */
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')

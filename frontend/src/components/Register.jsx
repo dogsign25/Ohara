@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { authApi, saveAuth } from '../api/auth.js'
 
+/** 신규 사용자 등록과 가입 후 자동 로그인을 처리한다. */
 export default function Register({ onSuccess, onGoLogin, onGoLanding }) {
   const [form,    setForm]    = useState({ username: '', email: '', password: '', confirm: '' })
   const [error,   setError]   = useState('')
@@ -8,6 +9,7 @@ export default function Register({ onSuccess, onGoLogin, onGoLanding }) {
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
 
+  /** 회원가입 폼을 검증하고 등록 API를 호출한다. */
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')

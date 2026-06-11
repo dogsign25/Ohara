@@ -24,6 +24,7 @@ class Result:
 
 
 def extract_batch(articles):
+    """여러 Article을 spaCy로 분석해 엔티티와 문장 단위 관계를 반환한다."""
     results = []
     texts = [a.text for a in articles]
     for article, doc in zip(articles, _nlp.pipe(texts, batch_size=32)):
@@ -33,6 +34,7 @@ def extract_batch(articles):
 
 
 def _extract(doc):
+    """spaCy Doc 하나에서 정규화된 엔티티와 공동 등장 관계를 추출한다."""
     mentions = []
 
     for ent in doc.ents:
@@ -82,6 +84,7 @@ def _extract(doc):
 
 
 def _build_sentence_relations(sentence_entities):
+    """같은 문장에 등장한 서로 다른 엔티티 쌍을 관계 후보로 만든다."""
     seen = set()
     relations = []
 
@@ -97,6 +100,7 @@ def _build_sentence_relations(sentence_entities):
 
 
 def _build_person_map(names):
+    """성·전체 이름 표현을 같은 인물로 합치기 위한 이름 매핑을 만든다."""
     """성(last name) 기준으로 풀네임 통합"""
     full_names   = {}
     single_names = []

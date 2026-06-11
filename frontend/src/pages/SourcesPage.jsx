@@ -12,6 +12,7 @@ const SOURCES = [
   'France 24',
 ]
 
+/** 최근 그래프 관계를 기사 출처 관점에서 요약해 보여준다. */
 export default function SourcesPage() {
   const [graph, setGraph] = useState({ nodes: [], edges: [] })
   const [loading, setLoading] = useState(true)

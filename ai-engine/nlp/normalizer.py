@@ -107,6 +107,7 @@ _HAS_ALPHA = re.compile(r"[A-Za-z]")
 
 
 def get_canonical_name(raw_text: str, spacy_label: str):
+    """원문 엔티티 표현을 중복 저장을 줄이기 위한 표준 이름으로 변환한다."""
     """
     엔티티 이름 정규화. 실패 시 None 반환.
     반환값: str | None  (튜플 아님)
@@ -142,6 +143,7 @@ def get_canonical_name(raw_text: str, spacy_label: str):
 
 
 def get_entity_type(raw_text: str, spacy_label: str):
+    """spaCy 라벨과 텍스트 규칙을 프로젝트의 엔티티 타입으로 변환한다."""
     """
     엔티티 타입 반환. 오분류 교정 포함.
     반환값: 'Country' | 'Organization' | 'Person' | None
@@ -163,12 +165,14 @@ def get_entity_type(raw_text: str, spacy_label: str):
 
 
 def _clean_entity_text(raw_text):
+    """HTML 조각과 불필요한 공백·문장부호를 엔티티 이름에서 제거한다."""
     text = html.unescape(raw_text or "")
     text = " ".join(text.split())
     return _EDGE_PUNCT.sub("", text)
 
 
 def _is_bad_person_name(text):
+    """사람 이름으로 보기 어려운 짧거나 오염된 표현인지 검사한다."""
     key = text.lower().strip()
     if len(text) < 3 or not _HAS_ALPHA.search(text):
         return True
@@ -180,6 +184,7 @@ def _is_bad_person_name(text):
 
 
 def _title(text):
+    """고유명사의 약어를 보존하면서 표시용 제목 표기로 정리한다."""
     LOWER = {"of", "the", "and", "in", "on", "at", "to", "for", "a", "an", "van", "de", "bin"}
     words = text.split()
     return " ".join(

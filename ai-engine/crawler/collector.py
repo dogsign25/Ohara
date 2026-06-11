@@ -63,6 +63,7 @@ class Article:
 
 
 def fetch_all():
+    """등록된 뉴스 소스를 순회하며 수집에 성공한 Article 목록을 반환한다."""
     articles = []
     for src in RSS_SOURCES:
         try:
@@ -76,6 +77,7 @@ def fetch_all():
 
 
 def _fetch(name, url):
+    """RSS 주소 하나를 읽어 항목별 본문과 메타데이터를 Article로 변환한다."""
     feed = feedparser.parse(url)
     result = []
     for entry in feed.entries:
@@ -107,11 +109,13 @@ def _fetch(name, url):
 
 
 def _clean(text):
+    """수집된 HTML 텍스트에서 태그와 연속 공백을 제거한다."""
     """HTML 엔티티 디코딩 + 공백 정리 (문제 3: women&#039;s 깨짐 해결)"""
     return html.unescape(text).strip()
 
 
 def _parse_date(entry):
+    """RSS 항목의 발행 시각을 timezone-aware datetime으로 변환한다."""
     try:
         if hasattr(entry, "published"):
             return dateparser.parse(entry.published).astimezone(timezone.utc)

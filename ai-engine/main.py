@@ -23,6 +23,7 @@ INTERVAL_SEC   = int(os.environ.get("INTERVAL_SEC", "300"))
 
 
 def run(writer):
+    """뉴스 수집, NER 추출, Neo4j 저장 파이프라인을 한 번 실행한다."""
     logger.info("=== 파이프라인 시작 ===")
     articles = fetch_all()
     logger.info(f"수집: {len(articles)}개")
@@ -35,6 +36,7 @@ def run(writer):
 
 
 def main():
+    """파이프라인을 즉시 실행한 뒤 설정된 주기로 반복 실행한다."""
     logger.info(f"OHARA NLP Engine 시작 (수집 주기: {INTERVAL_SEC}초)")
     writer = GraphWriter(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
 

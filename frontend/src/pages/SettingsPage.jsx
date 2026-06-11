@@ -9,6 +9,7 @@ const DEFAULTS = {
   densePanels: false,
 }
 
+/** 브라우저에 저장되는 그래프 표시 설정을 관리한다. */
 export default function SettingsPage() {
   const [settings, setSettings] = useState(DEFAULTS)
   const [saved, setSaved] = useState(false)
@@ -21,11 +22,13 @@ export default function SettingsPage() {
     }
   }, [])
 
+  /** 설정 객체의 특정 항목만 변경한다. */
   function update(key, value) {
     setSaved(false)
     setSettings(prev => ({ ...prev, [key]: value }))
   }
 
+  /** 현재 설정을 localStorage에 저장하고 완료 상태를 표시한다. */
   function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
     setSaved(true)
@@ -61,7 +64,7 @@ export default function SettingsPage() {
             <select
               value={settings.defaultDays}
               onChange={e => update('defaultDays', e.target.value)}
-              className="mt-2 w-full rounded-lg border border-white/10 bg-gray-950 px-3 py-2 text-sm text-white outline-none"
+              className="ohara-select mt-2 w-full rounded-lg border border-white/10 bg-gray-950 px-3 py-2 text-sm text-white outline-none"
             >
               <option value="">전체 기간</option>
               <option value="1">최근 1일</option>

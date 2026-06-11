@@ -7,13 +7,27 @@ import jakarta.servlet.http.HttpSession;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 인증 HTTP API 컨트롤러입니다.
+ *
+ * 호출 출처:
+ * - frontend/src/api/auth.js의 authApi.register/login/logout/me
+ *
+ * 서비스 출처:
+ * - 실제 회원가입, 로그인, 토큰 검증/삭제는 service/AuthService.java가 처리합니다.
+ *
+ * DTO 출처:
+ * - 요청/응답 record는 model/AuthDto.java에 있습니다.
+ */
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class AuthController {
 
+    /** 인증 비즈니스 로직 서비스입니다. 파일 위치: service/AuthService.java */
     private final AuthService authService;
 
+    /** Spring 생성자 주입입니다. */
     public AuthController(AuthService authService) {
         this.authService = authService;
     }
@@ -23,6 +37,9 @@ public class AuthController {
      * 새 사용자를 만들고, 성공하면 토큰을 발급한 뒤 서버 세션에도 로그인 상태를 저장합니다.
      * 프론트엔드는 응답의 token/username을 세션 스토리지에 보관하고,
      * 서버는 JSESSIONID로 새로고침 이후 로그인 상태를 복원합니다.
+     *
+     * 연결 흐름:
+     * authApi.register() -> AuthController.register() -> AuthService.register()
      */
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody AuthDto.RegisterRequest req, HttpSession session) {
@@ -41,6 +58,9 @@ public class AuthController {
      * POST /api/auth/login
      * username/password를 검증하고 성공 시 토큰과 HttpSession을 함께 발급합니다.
      * 검증 실패는 400으로 내려 클라이언트가 사용자에게 메시지를 표시할 수 있게 합니다.
+     *
+     * 연결 흐름:
+     * authApi.login() -> AuthController.login() -> AuthService.login()
      */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthDto.LoginRequest req, HttpSession session) {
@@ -59,6 +79,9 @@ public class AuthController {
      * POST /api/auth/logout
      * Authorization 헤더의 토큰을 삭제하고 서버 세션을 무효화합니다.
      * 세션과 토큰을 모두 정리해 새로고침 후 자동 복원이 일어나지 않게 합니다.
+     *
+     * 연결 흐름:
+     * authApi.logout() -> AuthController.logout() -> AuthService.logout()
      */
     @PostMapping("/logout")
     public ResponseEntity<?> logout(
@@ -76,6 +99,9 @@ public class AuthController {
      * 1순위로 기존 HttpSession에서 로그인 상태를 복원합니다.
      * 세션이 없으면 Authorization Bearer 토큰을 검증하고,
      * 유효한 토큰이면 새 세션을 만들어 이후 새로고침에 대비합니다.
+     *
+     * 연결 흐름:
+     * authApi.me() -> AuthController.me() -> AuthService.validateToken()/getUsernameFromToken()
      */
     @GetMapping("/me")
     public ResponseEntity<?> me(
@@ -114,6 +140,13 @@ public class AuthController {
     /**
      * 인증 성공 응답을 HttpSession에 저장합니다.
      * 컨트롤러에서 세션 저장을 한 곳으로 모아 회원가입/로그인 흐름을 동일하게 유지합니다.
+     *
+     * 메서드 위치:
+     * - backend/src/main/java/com/ohara/controller/AuthController.java 내부 private 메서드입니다.
+     *
+     * 호출 출처:
+     * - register()
+     * - login()
      */
     private void saveSession(HttpSession session, AuthDto.AuthResponse response) {
         session.setAttribute("username", response.username());
